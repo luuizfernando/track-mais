@@ -1,56 +1,56 @@
-# Sistema de Controle de Expedição - Projeto Integrador IV
+# Track+ - Shipping Control System
 
-## 📋 Sobre o Projeto
+## 📋 About the Project
 
-Sistema web responsivo desenvolvido para automatizar o processo de controle e rastreamento de expedição de produtos alimentícios, com foco na geração de relatórios para conformidade regulatória junto ao DIPOVA/Ministério da Agricultura.
+Responsive web system developed to automate the process of controlling and tracking the shipment of food products, focusing on generating reports for regulatory compliance with DIPOVA/Ministry of Agriculture.
 
-## 🎯 Objetivos
+## 🎯 Objectives
 
-- Digitalizar o processo de controle de expedição atualmente realizado manualmente
-- Automatizar a geração de relatórios internos e regulatórios
-- Reduzir atividades manuais e erros de transcrição
-- Facilitar o compliance com órgãos fiscalizadores
+- Digitize the currently manually managed shipping control process
+- Automate the generation of internal and regulatory reports
+- Reduce manual activities and transcription errors
+- Facilitate compliance with regulatory agencies
 
-## 👥 Usuários do Sistema
+## 👥 System Users
 
-- **Auxiliar de Controle Comercial**: Responsável pelo registro das expedições
-- **Controle de Qualidade**: Monitoramento e validação dos processos
-- **Entregadores**: Consulta de informações de expedição e confirmação de entregas
+- **Commercial Control Assistant**: Responsible for recording shipments
+- **Quality Control**: Monitoring and validating processes
+- **Delivery Persons**: Consulting shipment information and confirming deliveries
 
-## ⚙️ Funcionalidades Principais
+## ⚙️ Main Features
 
-### 📦 Controle de Expedição
-- Registro de dados do veículo (placa, condições sanitárias, temperatura)
-- Controle de lotes de produção
-- Registro de produtos expedidos e quantidades
-- Vinculação com notas fiscais
-- Cadastro de clientes/compradores
+### 📦 Shipping Control
+- Vehicle data recording (license plate, sanitary conditions, temperature)
+- Production batch control
+- Recording of shipped products and quantities
+- Linking with invoices
+- Customer/buyer registration
 
-### 📊 Geração de Relatórios
+### 📊 Report Generation
 
-#### Relatório Interno da Empresa
-- Responsável pelo preenchimento
-- Frequência e objetivo
-- Dados do veículo e condições sanitárias
-- Informações de produtos, lotes e quantidades
-- Dados do comprador
-- Controle de temperatura (0°C a 5°C)
+#### Internal Company Report
+- Person responsible for completion
+- Frequency and purpose
+- Vehicle data and sanitary conditions
+- Product, batch, and quantity information
+- Buyer data
+- Temperature control (0°C to 5°C)
 
-#### Relatório DIPOVA (Mensal)
-- Dados do estabelecimento
-- Informações de produtos e lotes
-- Datas de produção e expedição
-- Quantidades em quilos
-- Destino e dados do entregador
-- Controle de temperatura
+#### DIPOVA Report (Monthly)
+- Establishment data
+- Product and batch information
+- Production and shipping dates
+- Quantities in kilograms
+- Destination and delivery person data
+- Temperature control
 
-### 📈 Exportação
-- Relatórios exportáveis em formato Excel
-- Geração diária de relatórios internos
-- Compilação mensal para envio ao órgão regulador
+### 📈 Export
+- Exportable reports in Excel format
+- Daily generation of internal reports
+- Monthly compilation for submission to the regulatory agency
 
-## 💻 Requisitos Técnicos
+## 💻 Technical Requirements
 
-- **Responsividade**: Compatível com computadores, tablets e celulares
-- **Formato de Exportação**: Excel (.xlsx)
+- **Responsiveness**: Compatible with computers, tablets, and cell phones
+- **Export Format**: Excel (.xlsx)
 
