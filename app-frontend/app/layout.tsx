@@ -6,8 +6,8 @@ import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
-  title: 'LF Solutions',
-  description: 'LF Solutions - Soluções em Tecnologia',
+  title: 'Track+',
+  description: 'Track+ - Soluções em Tecnologia',
   generator: 'next.js',
   icons: {
     icon: "/truck-logo.png",

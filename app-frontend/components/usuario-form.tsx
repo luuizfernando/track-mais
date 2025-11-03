@@ -56,7 +56,7 @@ export function UsuarioForm({ onCancel, onSuccess }: UsuarioFormProps = {}) {
         return
       }
 
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/usuarios/usuarios`,
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/usuarios/cadastrar-usuario`,
         {
           name: nome,
           username,

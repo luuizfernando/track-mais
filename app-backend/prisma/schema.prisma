@@ -21,26 +21,27 @@ model Users {
 }
 
 model Customers {
-  code              Int       @id
-  legal_name        String?
-  fantasy_name      String?
-  state_subscrition String?
-  neighborhood      String?
-  state             String?
-  address           String?
-  cep               String?
-  corporate_network String?
-  cnpj_cpf          String?   @map("cnpj/cpf")
-  email             String?
-  phone             String?
-  last_sale_date    DateTime? @db.Date
-  payment_method    String?
+  code                  Int                @id
+  legal_name            String?
+  fantasy_name          String?
+  state_subscrition     String?
+  neighborhood          String?
+  state                 String?
+  address               String?
+  cep                   String?
+  corporate_network     String?
+  cnpj_cpf              String?               @map("cnpj/cpf")
+  email                 String?
+  phone                 String?
+  last_sale_date        DateTime?             @db.Date
+  payment_method        String?
+  daily_shipment_report DailyShipmentReport[]
 
   @@map("customers")
 }
 
 model Product {
-  code             Int       @id @unique
+  code             BigInt    @id @unique
   description      String?
   group            String?
   company          String?
@@ -51,32 +52,36 @@ model Product {
 }
 
 model Vehicle {
-  id           Int                   @id @default(autoincrement())
-  model        String                @db.VarChar(100)
-  plate        String                @db.VarChar(10)
-  description  String?
-  maximumLoad  Float?
-  phone        String?
-  dailyReports DailyShipmentReport[]
+  id                    Int                   @id @default(autoincrement())
+  model                 String                @db.VarChar(100)
+  plate                 String                @unique
+  description           String?
+  maximumLoad           Float?
+  phone                 String?
+  daily_shipment_report DailyShipmentReport[]
 
   @@map("vehicles")
 }
 
 model DailyShipmentReport {
-  id                Int      @id @default(autoincrement())
-  quantity          Int
-  invoiceNumber     Int
-  productionDate    DateTime
-  destination       String   @db.VarChar(60)
-  temperature       Decimal
-  sanitaryCondition Boolean
-  deliverer         String   @db.VarChar(100)
-  userId            Int
-  vehicleId         Int
-  productId         Int
-  customersId       Int
-  users             Users    @relation(fields: [userId], references: [id])
-  vehicle           Vehicle  @relation(fields: [vehicleId], references: [id])
+  id                       Int       @id @default(autoincrement())
+  quantity                 Int
+  invoiceNumber            Int
+  productionDate           DateTime
+  vehicleTemperature       Float     @db.Real
+  hasGoodSanitaryCondition Boolean
+  driver                   String
+  userId                   Int
+  products                 Json?
+  customerCode             Int
+  hasSifOrSisbi            Boolean
+  productTemperature       Float     @db.Real
+  fillingDate              DateTime  @db.Date
+  shipmentDate             DateTime  @db.Date
+  deliverVehicle           String?
+  customers                Customers @relation(fields: [customerCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  vehicles                 Vehicle?  @relation(fields: [deliverVehicle], references: [plate], onDelete: NoAction, onUpdate: NoAction)
+  users                    Users     @relation(fields: [userId], references: [id])
 
   @@map("daily_shipment_report")
 }

@@ -10,7 +10,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 // cadastrar um user (check)
 //deletar um user 
 // atualizar um user
-// @UseGuards(AuthTokenGuard)
+@UseGuards(AuthTokenGuard)
 @Controller('usuarios')
 export class UsersController {
 

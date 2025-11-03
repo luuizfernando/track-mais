@@ -4,6 +4,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { AuthTokenGuard } from 'src/auth/guard/auth-token.guard';
 import { AdminRolesGuard } from 'src/auth/guard/roles/admin-roles.guard';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @UseGuards(AuthTokenGuard)
 @Controller('customers')
@@ -17,8 +18,8 @@ export class CustomersController {
   }
 
   @Get()
-  findAll() {
-    return this.customersService.findAll();
+  findAll(@Query() paginationDto: PaginationDto) {
+    return this.customersService.findAll(paginationDto);
   }
 
   @UseGuards(AdminRolesGuard)

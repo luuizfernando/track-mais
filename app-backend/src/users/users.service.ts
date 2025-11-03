@@ -61,7 +61,7 @@ export class UsersService {
           skip: offset,
           take: limit,
           select: {
-            id: true,
+            id: true, 
             name: true,
             username: true,
             role: true,

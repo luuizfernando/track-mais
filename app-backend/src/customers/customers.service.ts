@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { CreateCustomerDto } from "./dto/create-customer.dto";
 import { UpdateCustomerDto } from "./dto/update-customer.dto";
 import { PrismaService } from "src/prisma/prisma.service";
+import { PaginationDto } from "src/common/dto/pagination.dto";
 
 @Injectable()
 export class CustomersService {
@@ -51,10 +52,31 @@ export class CustomersService {
     }
   }
 
-  async findAll() {
-    return await this.prisma.customers.findMany({
-      orderBy: { code: "desc" } as any,
-    } as any);
+  async findAll(paginationDto: PaginationDto) {
+    const { limit = 14, offset = 0 } = paginationDto;
+
+    try {
+      const [customers, total] = await this.prisma.$transaction([
+        this.prisma.customers.findMany({
+          skip: offset,
+          take: limit,
+          orderBy: { code: "desc" } as any,
+        } as any),
+        this.prisma.customers.count(),
+      ]);
+
+      return {
+        data: customers,
+        limit,
+        offset,
+        total,
+      };
+    } catch (err) {
+      throw new HttpException(
+        "Erro ao buscar clientes.",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   async update(id: number, updateCustomerDto: UpdateCustomerDto) {

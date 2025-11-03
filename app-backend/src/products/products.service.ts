@@ -2,6 +2,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @Injectable()
 export class ProductsService {
@@ -20,7 +21,7 @@ export class ProductsService {
         }
       );
 
-      if (Number(createProductDto.code) === findCode?.code) {
+      if (findCode && Number(createProductDto.code) === Number(findCode.code)) {
         throw new HttpException('Esse produto já existe.', HttpStatus.CONFLICT);
       }
 
@@ -44,10 +45,31 @@ export class ProductsService {
     }
   }
 
-  async findAll() {
-    return this.prisma.product.findMany({
-      orderBy: { code: 'desc' } as any,
-    } as any);
+  async findAll(paginationDto: PaginationDto) {
+    const { limit = 10, offset = 0 } = paginationDto;
+
+    try {
+      const [products, total] = await this.prisma.$transaction([
+        this.prisma.product.findMany({
+          skip: offset,
+          take: limit,
+          orderBy: { code: 'desc' } as any,
+        } as any),
+        this.prisma.product.count(),
+      ]);
+
+      return {
+        data: products,
+        limit,
+        offset,
+        total,
+      };
+    } catch (err) {
+      throw new HttpException(
+        'Erro ao buscar produtos.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   findOne(id: number) {
