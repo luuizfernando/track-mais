@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import OnboardingForm from "./multistep-form";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { ApiCustomer, ApiDailyReport, ApiMonthlyReport, ApiProduct, ApiUser, ReportRow } from "@/utils/types/main";
 
 import {
   AlertDialog,
@@ -32,84 +33,6 @@ export function ReportsPage() {
     dataRange: "01-08-2025 a 30-08-2025",
   });
   const [expandedMonths, setExpandedMonths] = useState<string[]>(["Jul-2025"]);
-
-  // Estado para tabela de relatórios
-  type ApiDailyReport = {
-    id: number;
-    invoiceNumber: string | number;
-    customerCode: number | string; // pode vir como string se BigInt serializado
-    products: Array<{
-      code: number | string;
-      quantity: number;
-      description?: string;
-      sifOrSisbi?: string;
-      productTemperature?: number;
-      productionDate?: string;
-    }>;
-    shipmentDate: string; // legado
-    productionDate?: string; // ISO (agregado)
-    fillingDate?: string; // ISO (momento do preenchimento)
-    userId: number;
-    deliverVehicle?: string | null;
-    driver?: string;
-    hasGoodSanitaryCondition: boolean;
-    productTemperature: number;
-  };
-
-  type ApiCustomer = {
-    code: number;
-    legal_name: string | null;
-    state: string | null;
-  };
-
-  type ApiProduct = {
-    code: number | string;
-    description: string | null;
-  };
-
-  type ApiUser = {
-    id: number;
-    name: string;
-    username: string;
-  };
-
-  // Registros mensais (DIPOVA)
-  type ApiMonthlyReport = {
-    id: number;
-    quantity: string | number; // Decimal vem como string
-    destination: string;
-    temperature: string | number;
-    deliverer: string;
-    productionDate: string; // ISO
-    shipmentDate: string; // ISO
-    productId: number; // código do produto
-    customersId: number;
-  };
-
-  type ReportRow = {
-    reportId: number;
-    invoiceNumber: string;
-    customerCode?: number;
-    clientName: string;
-    destination: string;
-    userId: number;
-    userName?: string;
-    deliverVehicle?: string | null;
-    driver?: string;
-    hasGoodSanitaryCondition: boolean;
-    productTemperature: number;
-    fillingDate: string;
-    fillingDateIso: string;
-    products: Array<{
-      productCode: string;
-      productName: string;
-      quantity: number;
-      productionDate: string;
-      productTemperature?: number;
-      sifOrSisbi?: string;
-    }>;
-  };
-
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [monthly, setMonthly] = useState<ApiMonthlyReport[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -825,7 +748,7 @@ export function ReportsPage() {
                                             </div>
                                             <div>
                                               <div className="text-gray-600">
-                                                Temperatura do caminhão
+                                                Temperatura do veículo
                                               </div>
                                               <div className="font-medium">
                                                 {row.productTemperature ?? 0} °C
@@ -956,7 +879,7 @@ export function ReportsPage() {
                         Temp.
                       </th>
                       <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">
-                        Entregador/caminhão
+                        Entregador/Caminhão
                       </th>
                     </tr>
                   </thead>

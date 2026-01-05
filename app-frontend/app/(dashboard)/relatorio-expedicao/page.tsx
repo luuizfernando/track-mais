@@ -1,4 +1,4 @@
-import { ReportsPage } from "@/components/reports-page"
+import { ReportsPage } from "@/components/ReportsPage"
 
 export default function RelatorioExpedicaoPage() {
   return (
