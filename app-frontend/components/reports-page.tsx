@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronRight, Edit, Trash2, Filter } from "lucide-react";
+import { Edit, Trash2, Filter } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 // 1. IMPORTS ADICIONADOS
@@ -113,7 +113,7 @@ export function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedRowKeys, setExpandedRowKeys] = useState<Set<string>>(new Set());
 
-  const formatDate = (input: any) => {
+  const formatDate = (input: Date | string | number | null | undefined | object) => {
     if (!input) return "N/A";
     let iso: string | null = null;
     if (input instanceof Date) {
@@ -147,7 +147,7 @@ export function ReportsPage() {
   };
 
   const capitalize = (s: string) => s ? (s.charAt(0).toUpperCase() + s.slice(1)) : s;
-  const getMonthKey = (input: any) => {
+  const getMonthKey = (input: Date | string | number | null | undefined) => {
     let d: Date | null = null;
     if (input instanceof Date) {
       d = input;
@@ -233,18 +233,18 @@ export function ReportsPage() {
 
           const productRows: ReportRow["products"] = [];
           for (const it of items) {
-            const codeNum = Number((it as any)?.code);
+            const codeNum = Number(it?.code);
             const prod = productByCode.get(codeNum);
             const prodName = prod?.description ?? it?.description ?? "N/A";
-            const qty = Number((it as any)?.quantity) || 0;
-            const prodDateIso = String((it as any)?.productionDate ?? r.productionDate ?? r.shipmentDate);
+            const qty = Number(it?.quantity) || 0;
+            const prodDateIso = String(it?.productionDate ?? r.productionDate ?? r.shipmentDate);
             productRows.push({
-              productCode: String((it as any)?.code ?? ""),
+              productCode: String(it?.code ?? ""),
               productName: prodName,
               quantity: qty,
               productionDate: formatDate(prodDateIso),
-              productTemperature: Number((it as any)?.productTemperature ?? r.productTemperature ?? 0),
-              sifOrSisbi: String((it as any)?.sifOrSisbi ?? "") || undefined,
+              productTemperature: Number(it?.productTemperature ?? r.productTemperature ?? 0),
+              sifOrSisbi: String(it?.sifOrSisbi ?? "") || undefined,
             });
           }
 
@@ -267,9 +267,14 @@ export function ReportsPage() {
 
         setRows(builtRows);
         setMonthly(monthlyReports);
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(e);
-        const msg = e?.response?.data?.message || e?.message || "Erro ao carregar relatórios.";
+        let msg = "Erro ao carregar relatórios.";
+        if (axios.isAxiosError(e)) {
+            msg = e.response?.data?.message || e.message;
+        } else if (e instanceof Error) {
+            msg = e.message;
+        }
         setError(msg);
       } finally {
         setLoading(false);
@@ -379,8 +384,13 @@ export function ReportsPage() {
       // Atualizar estado local
       setRows((prev) => prev.map((r) => (r.reportId === editRow.reportId ? { ...editRow } : r)));
       setEditOpen(false);
-    } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || "Falha ao atualizar relatório.";
+    } catch (e: unknown) {
+      let msg = "Falha ao atualizar relatório.";
+      if (axios.isAxiosError(e)) {
+        msg = e.response?.data?.message || e.message;
+      } else if (e instanceof Error) {
+        msg = e.message;
+      }
       alert(msg);
     }
   };
@@ -746,104 +756,72 @@ export function ReportsPage() {
                         return (<tr><td className="px-3 py-2 text-sm text-red-600" colSpan={7}>{error}</td></tr>);
                       }
 
-                      // Request 1: Usar productsState como a fonte da verdade.
-                      // Precisamos que o productsState esteja carregado.
-                      if (!productsState || productsState.length === 0) {
-                        return (<tr><td className="px-3 py-2 text-sm" colSpan={7}>Nenhum produto cadastrado.</td></tr>);
-                      }
-
-                      // Helper: Correção para Request 2 (Cálculo de Quantidade)
-                      // Esta função analisa corretamente uma string numérica.
-                      const parseQuantity = (q: any): number => {
-                        if (q === null || q === undefined) return 0;
-                        // Se já for um número, retorne
-                        if (typeof q === 'number') return q;
-
-                        // Tenta converter para string
-                        let s: string;
-                        try {
-                          s = String(q).trim();
-                        } catch (e) {
-                          return 0; // Falha ao converter
-                        }
-
-                        if (!s) return 0; // String vazia
-
-                        const hasComma = s.includes(',');
-                        const hasDot = s.includes('.');
-
-                        // Caso 1: Formato "1.234,56" (pt-BR com milhar)
-                        if (hasComma && hasDot && s.lastIndexOf('.') < s.lastIndexOf(',')) {
-                          s = s.replace(/\./g, '').replace(/,/g, '.'); // "1.234,56" -> "1234.56"
-                        }
-                        // Caso 2: Formato "1,234.56" (en-US com milhar)
-                        else if (hasComma && hasDot && s.lastIndexOf(',') < s.lastIndexOf('.')) {
-                          s = s.replace(/,/g, ''); // "1,234.56" -> "1234.56"
-                        }
-                        // Caso 3: Formato "1234,56" (pt-BR simples)
-                        else if (hasComma && !hasDot) {
-                          s = s.replace(/,/g, '.'); // "1234,56" -> "1234.56"
-                        }
-                        // Caso 4: Formato "1234.56" (padrão) ou "1234" (inteiro)
-                        // Nenhuma ação necessária, 'Number()' já entende.
-
-                        const n = Number(s);
-                        return isNaN(n) ? 0 : n;
+                      // Agregação por Produto + Cliente (DIPOVA)
+                      type DipovaItem = {
+                        productCode: number;
+                        productName: string;
+                        clientName: string;
+                        quantity: number;
                       };
+                      const dipovaMap = new Map<string, DipovaItem>();
 
-                      // Criar um mapa de agregação para Quantidades com base nos relatórios diários carregados (rows)
-                      // Isso garante que a aba DIPOVA reflita imediatamente exclusões/edições feitas no frontend e persistidas no backend.
-                      const quantityPerProduct = new Map<number, number>();
                       const selectedMonthKey = dipovaMonth ?? (orderedMonthKeys[0] ?? getMonthKey(new Date()));
+
                       for (const r of rows) {
-                        // Considerar apenas o mês selecionado (data de preenchimento)
+                        // Considerar apenas o mês selecionado
                         if (getMonthKey(r.fillingDateIso) !== selectedMonthKey) continue;
+
+                        // O destino é o nome do cliente
+                        const destination = r.clientName || "N/A";
+
                         for (const p of r.products) {
-                          const productId = Number(p.productCode);
-                          const currentQty = quantityPerProduct.get(productId) || 0;
-                          const addQty = Number(p.quantity) || 0;
-                          quantityPerProduct.set(productId, currentQty + addQty);
+                          const pCode = Number(p.productCode);
+                          const qty = Number(p.quantity) || 0;
+                          if (qty <= 0) continue;
+
+                          // Chave composta para agrupar por Produto E Cliente
+                          const key = `${pCode}|${destination}`;
+                          const existing = dipovaMap.get(key);
+
+                          if (existing) {
+                            existing.quantity += qty;
+                          } else {
+                            dipovaMap.set(key, {
+                              productCode: pCode,
+                              productName: p.productName,
+                              clientName: destination,
+                              quantity: qty
+                            });
+                          }
                         }
                       }
 
-                      // Valores fixos do código original (pois não são específicos do produto)
+                      const sortedItems = Array.from(dipovaMap.values()).sort((a, b) =>
+                        a.productName.localeCompare(b.productName) || a.clientName.localeCompare(b.clientName)
+                      );
+
+                      // Valores fixos
                       const abbrCurrent = formatMonthBr(new Date().toISOString());
-                      const defaultDest = 'N/A'; // Ou "Distrito Federal" se preferir
                       const defaultTemp = '0 °C';
                       const defaultDeliverer = 'Próprio';
 
-                      // Request 1: Fazer o loop sobre 'productsState' em vez de 'monthly'
-                      // Observação: usar um nome diferente de 'rows' para evitar sombra do estado 'rows' (ReportRow[])
-                      // Regra: ocultar produtos com quantidade 0 na tabela DIPOVA
-                      const filteredProducts = productsState.filter((product) => {
-                        const prodCode = Number(product.code);
-                        const qtyNum = quantityPerProduct.get(prodCode) || 0;
-                        return qtyNum > 0;
-                      });
-                      const tableRows = filteredProducts.map((product) => {
-                        const prodCode = Number(product.code);
-                        const prodName = product.description ?? `Produto ${prodCode}`;
+                      if (sortedItems.length === 0) {
+                         return (<tr><td className="px-3 py-2 text-sm" colSpan={7}>Nenhum registro encontrado para este mês.</td></tr>);
+                      }
 
-                        // Request 2: Obter a soma pré-calculada para este produto
-                        const qtyNum = quantityPerProduct.get(prodCode) || 0;
-
-                        // Como agregamos a quantidade, colunas como "Destino" perdem o
-                        // detalhe transacional. Manteremos os valores padrão que já
-                        // estavam no código.
-
+                      const tableRows = sortedItems.map((item, idx) => {
                         return (
-                          <tr key={`dipova-prod-${prodCode}`}>
-                            <td className="px-3 py-2">{prodName}</td>
+                          <tr key={`dipova-item-${idx}`}>
+                            <td className="px-3 py-2">{item.productName}</td>
                             <td className="px-3 py-2">{abbrCurrent}</td>
                             <td className="px-3 py-2">{abbrCurrent}</td>
                             <td className="px-3 py-2">
-                              {/* Formata o número para o padrão pt-BR (ex: 1.234,50) */}
-                              {qtyNum.toLocaleString('pt-BR', {
+                              {item.quantity.toLocaleString('pt-BR', {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2
                               })}
                             </td>
-                            <td className="px-3 py-2">{defaultDest}</td>
+                            <td className="px-3 py-2">{item.clientName}</td>
                             <td className="px-3 py-2">{defaultTemp}</td>
                             <td className="px-3 py-2">{defaultDeliverer}</td>
                           </tr>
@@ -851,7 +829,7 @@ export function ReportsPage() {
                       });
 
                       // Soma total das quantidades exibidas
-                      const totalQty = Array.from(quantityPerProduct.values()).reduce((acc, n) => acc + (Number(n) || 0), 0);
+                      const totalQty = sortedItems.reduce((acc, item) => acc + item.quantity, 0);
 
                       // Linha de rodapé com valor apenas em Quant.
                       const footerRow = (
@@ -1106,8 +1084,13 @@ export function ReportsPage() {
                     title: "Exclusão efetuada com sucesso",
                     description: "O relatório foi excluído.",
                   });
-                } catch (e: any) {
-                  const msg = e?.response?.data?.message || e?.message || "Falha ao excluir relatório.";
+                } catch (e: unknown) {
+                  let msg = "Falha ao excluir relatório.";
+                  if (axios.isAxiosError(e)) {
+                    msg = e.response?.data?.message || e.message;
+                  } else if (e instanceof Error) {
+                    msg = e.message;
+                  }
                   setDeleteOpen(false);
                   setPendingDeleteId(null);
                   alert(msg);
