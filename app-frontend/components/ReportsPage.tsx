@@ -11,9 +11,16 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import OnboardingForm from "./multistep-form";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { ApiCustomer, ApiDailyReport, ApiMonthlyReport, ApiProduct, ApiUser, ReportRow } from "@/utils/types/main";
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import {
+  ApiCustomer,
+  ApiDailyReport,
+  ApiMonthlyReport,
+  ApiProduct,
+  ApiUser,
+  ReportRow,
+} from "@/utils/types/main";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 import {
   AlertDialog,
@@ -83,7 +90,7 @@ export function ReportsPage() {
 
   const capitalize = (s: string) =>
     s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-    
+
   const getMonthKey = (input: Date | string | number | null | undefined) => {
     let d: Date | null = null;
     if (input instanceof Date) {
@@ -334,43 +341,49 @@ export function ReportsPage() {
     // 2. Criar o Workbook com ExcelJS
     const workbook = new ExcelJS.Workbook();
     // O nome da aba será algo como "Jan-25" (derivado do dipovaMonth que é Jan-2025 ou similar)
-    const sheetName = dipovaMonth.split("-").map((p, i) => i === 1 ? p.slice(2) : p).join("-");
+    const sheetName = dipovaMonth
+      .split("-")
+      .map((p, i) => (i === 1 ? p.slice(2) : p))
+      .join("-");
     const worksheet = workbook.addWorksheet(sheetName);
 
     // 3. Configurar Cabeçalho Fixo (Estilo Relatório DIPOVA)
     // Linha 1: Título
-    worksheet.mergeCells('A1:H1');
-    const titleCell = worksheet.getCell('A1');
-    titleCell.value = 'Relatório de Comercialização de produtos';
+    worksheet.mergeCells("A1:H1");
+    const titleCell = worksheet.getCell("A1");
+    titleCell.value = "Relatório de Comercialização de produtos";
     titleCell.font = { bold: true, size: 14 };
-    titleCell.alignment = { horizontal: 'center' };
+    titleCell.alignment = { horizontal: "center" };
 
     // Linha 2: Estabelecimento
     worksheet.mergeCells('A2:E2');
     worksheet.getCell('A2').value = 'ESTABELECIMENTO: DA ROÇA COMÉRCIO E INDÚSTRIA DE ALIMENTOS LTDA-ME';
     worksheet.getCell('A2').font = { bold: true, size: 9 };
-    
+
     worksheet.mergeCells('F2:H2');
     worksheet.getCell('F2').value = 'Nº REG. DIPOVA: 442';
     worksheet.getCell('F2').font = { bold: true, size: 9 };
 
     // Linha 3: Endereço
-    worksheet.mergeCells('A3:E3');
-    worksheet.getCell('A3').value = 'ENDEREÇO: ADE QUADRA 2 CONJUNTO A P SUL LOTE 11 - CEILÂNDIA - BRASÍLIA/DF';
-    worksheet.getCell('A3').font = { size: 9 };
+    worksheet.mergeCells("A3:E3");
+    worksheet.getCell("A3").value =
+      "ENDEREÇO: ADE QUADRA 2 CONJUNTO A P SUL LOTE 11 - CEILÂNDIA - BRASÍLIA/DF";
+    worksheet.getCell("A3").font = { size: 9 };
 
-    worksheet.mergeCells('F3:H3');
-    worksheet.getCell('F3').value = 'TEL/FAX: (61) 3578-4223';
-    worksheet.getCell('F3').font = { size: 9 };
+    worksheet.mergeCells("F3:H3");
+    worksheet.getCell("F3").value = "TEL/FAX: (61) 3578-4223";
+    worksheet.getCell("F3").font = { size: 9 };
 
     // Linha 4: Mês Referência
-    worksheet.mergeCells('A4:C4');
-    worksheet.getCell('A4').value = `MÊS/ANO DE REFERÊNCIA: ${dipovaMonth.toUpperCase()}`;
-    worksheet.getCell('A4').font = { bold: true, size: 9 };
+    worksheet.mergeCells("A4:C4");
+    worksheet.getCell(
+      "A4"
+    ).value = `ANO DE REFERÊNCIA: ${new Date().getFullYear()}`;
+    worksheet.getCell("A4").font = { bold: true, size: 9 };
 
-    worksheet.mergeCells('D4:H4');
-    worksheet.getCell('D4').value = 'RESP. PREENCHIMENTO: TAYNARA SOUZA'; // Você pode pegar isso dinamicamente se tiver
-    worksheet.getCell('D4').font = { size: 9 };
+    worksheet.mergeCells("D4:H4");
+    worksheet.getCell("D4").value = "RESP. PREENCHIMENTO: TAYNARA SOUZA"; // Você pode pegar isso dinamicamente se tiver
+    worksheet.getCell("D4").font = { size: 9 };
 
     // Espaço em branco
     worksheet.addRow([]);
@@ -379,24 +392,24 @@ export function ReportsPage() {
     // Linha 7: Cabeçalho da Tabela
     const headerRow = worksheet.getRow(7);
     headerRow.values = [
-      'Produto', 
-      'Data de produção/lote', 
-      'Data da expedição', 
-      'Quant.', 
-      'Destino', 
-      '', // Coluna vazia pra espaçamento se necessário, ou merge
-      'Temp.', 
-      'Entregador/caminhão'
+      "Produto",
+      "Data de produção/lote",
+      "Data da expedição",
+      "Quant.",
+      "Destino",
+      "", // Coluna vazia pra espaçamento se necessário, ou merge
+      "Temp.",
+      "Entregador/caminhão",
     ];
     headerRow.font = { bold: true };
     headerRow.eachCell((cell) => {
-      cell.border = { bottom: { style: 'thin' } };
+      cell.border = { bottom: { style: "thin" } };
     });
 
     // Ajuste da coluna F (que nos CSVs parece estar vazia ou mesclada com Destino, vamos seguir o padrão visual)
     // No seu CSV exemplo: Produto, Data, Data, Quant, Destino, (vazio), Temp, Entregador.
     // Vamos replicar isso.
-    
+
     // 4. Inserir Dados
     let totalQty = 0;
     sortedItems.forEach((item) => {
@@ -407,19 +420,28 @@ export function ReportsPage() {
         item.expeditionDate, // formatToDayMonth se quiser encurtar
         item.quantity,
         item.clientName,
-        '', // Coluna vazia
+        "", // Coluna vazia
         `${item.truckTemperature} °C`,
-        `${item.driver} / ${item.vehicle}`
+        `${item.driver} / ${item.vehicle}`,
       ]);
-      
+
       // Formatação simples
-      row.getCell(4).numFmt = '#,##0.00'; // Formato numérico para quantidade
+      row.getCell(4).numFmt = "#,##0.00"; // Formato numérico para quantidade
     });
 
     // 5. Total
-    const totalRow = worksheet.addRow(['', '', 'TOTAL:', totalQty, '', '', '', '']);
+    const totalRow = worksheet.addRow([
+      "",
+      "",
+      "TOTAL:",
+      totalQty,
+      "",
+      "",
+      "",
+      "",
+    ]);
     totalRow.font = { bold: true };
-    totalRow.getCell(4).numFmt = '#,##0.00';
+    totalRow.getCell(4).numFmt = "#,##0.00";
 
     // 6. Ajuste de largura das colunas (Opcional, mas fica melhor)
     worksheet.getColumn(1).width = 35; // Produto
@@ -432,8 +454,8 @@ export function ReportsPage() {
 
     // 7. Download
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `Relatorio_Comercializacao_${dipovaMonth}.xlsx`);
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    saveAs(blob, `Relatorio_Comercializacao_${new Date().getFullYear()}.xlsx`);
   };
 
   const toggleRow = (key: string) => {
@@ -473,8 +495,7 @@ export function ReportsPage() {
         ]);
         setCustomersState(custRes.data?.data ?? []);
         setProductsState(prodRes.data?.data ?? []);
-      } catch (_) {
-      }
+      } catch (_) {}
     })();
   }, []);
 
@@ -954,13 +975,13 @@ export function ReportsPage() {
                 </Tabs>
 
                 {/* BOTÃO DE DOWNLOAD AQUI */}
-                <Button 
-                    variant="outline" 
-                    className="flex items-center gap-2 border-green-600 text-green-700 hover:bg-green-50"
-                    onClick={handleExportExcel}
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2 border-green-600 text-green-700 hover:bg-green-50"
+                  onClick={handleExportExcel}
                 >
-                    <Download className="h-4 w-4" />
-                    Baixar Excel (DIPOVA)
+                  <Download className="h-4 w-4" />
+                  Baixar Excel (DIPOVA)
                 </Button>
               </div>
 
