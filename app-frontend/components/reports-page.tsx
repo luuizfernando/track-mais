@@ -659,7 +659,7 @@ export function ReportsPage() {
                                 {rExpanded && (
                                   <tr key={`${rkey}-details`} className="bg-gray-50">
                                     <td colSpan={4} className="px-4 py-3 text-sm text-gray-900">
-                                      <div className="mb-3 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                                      <div className="mb-3 grid md:grid-cols-2 gap-4 md:gap-6">
                                         <div>
                                           <div className="text-gray-600">Data de preenchimento</div>
                                           <div className="font-medium">{row.fillingDate ?? "—"}</div>
@@ -667,6 +667,10 @@ export function ReportsPage() {
                                         <div>
                                           <div className="text-gray-600">Placa do veículo</div>
                                           <div className="font-medium">{row.deliverVehicle ?? "—"}</div>
+                                        </div>
+                                        <div>
+                                          <div className="text-gray-600">Temperatura do caminhão</div>
+                                          <div className="font-medium">{row.productTemperature ?? 0} °C</div>
                                         </div>
                                         <div>
                                           <div className="text-gray-600">Condições sanitárias</div>
@@ -739,7 +743,7 @@ export function ReportsPage() {
                   <thead className="bg-gray-100 border-b">
                     <tr>
                       <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Produto</th>
-                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Data de produção/lote</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Data de produção</th>
                       <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Data da expedição</th>
                       <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Quant.</th>
                       <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Destino</th>
@@ -756,41 +760,41 @@ export function ReportsPage() {
                         return (<tr><td className="px-3 py-2 text-sm text-red-600" colSpan={7}>{error}</td></tr>);
                       }
 
-                      // Agregação por Produto + Cliente (DIPOVA)
                       type DipovaItem = {
                         productCode: number;
                         productName: string;
                         clientName: string;
                         quantity: number;
+                        truckTemperature: number;
                       };
                       const dipovaMap = new Map<string, DipovaItem>();
 
                       const selectedMonthKey = dipovaMonth ?? (orderedMonthKeys[0] ?? getMonthKey(new Date()));
 
                       for (const r of rows) {
-                        // Considerar apenas o mês selecionado
                         if (getMonthKey(r.fillingDateIso) !== selectedMonthKey) continue;
 
-                        // O destino é o nome do cliente
                         const destination = r.clientName || "N/A";
+                        const truckTemp = r.productTemperature ?? 0;
 
                         for (const p of r.products) {
                           const pCode = Number(p.productCode);
                           const qty = Number(p.quantity) || 0;
                           if (qty <= 0) continue;
 
-                          // Chave composta para agrupar por Produto E Cliente
                           const key = `${pCode}|${destination}`;
                           const existing = dipovaMap.get(key);
 
                           if (existing) {
                             existing.quantity += qty;
+                            existing.truckTemperature = truckTemp;
                           } else {
                             dipovaMap.set(key, {
                               productCode: pCode,
                               productName: p.productName,
                               clientName: destination,
-                              quantity: qty
+                              quantity: qty,
+                              truckTemperature: truckTemp
                             });
                           }
                         }
@@ -802,7 +806,7 @@ export function ReportsPage() {
 
                       // Valores fixos
                       const abbrCurrent = formatMonthBr(new Date().toISOString());
-                      const defaultTemp = '0 °C';
+                      // const defaultTemp = '0 °C'; // REMOVIDO: Usar temperatura real
                       const defaultDeliverer = 'Próprio';
 
                       if (sortedItems.length === 0) {
@@ -822,7 +826,7 @@ export function ReportsPage() {
                               })}
                             </td>
                             <td className="px-3 py-2">{item.clientName}</td>
-                            <td className="px-3 py-2">{defaultTemp}</td>
+                            <td className="px-3 py-2">{item.truckTemperature} °C</td>
                             <td className="px-3 py-2">{defaultDeliverer}</td>
                           </tr>
                         );
