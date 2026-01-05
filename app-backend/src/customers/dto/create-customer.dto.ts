@@ -1,4 +1,11 @@
-import { IsString, IsEmail, IsOptional, Matches, IsNotEmpty, IsNumberString } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  Matches,
+  IsNotEmpty,
+  IsNumberString,
+} from "class-validator";
 
 export class CreateCustomerDto {
   @IsNotEmpty()
@@ -15,7 +22,7 @@ export class CreateCustomerDto {
 
   @IsNotEmpty()
   @IsString()
-  @Matches(/^\d+$/, { message: 'CNPJ/CPF deve conter apenas números' })
+  @Matches(/^\d+$/, { message: "CNPJ/CPF deve conter apenas números" })
   cnpj_cpf: string;
 
   @IsNotEmpty()
@@ -27,7 +34,7 @@ export class CreateCustomerDto {
   email: string;
 
   @IsNotEmpty()
-  @Matches(/^\d+$/, { message: 'Telefone deve conter apenas números' })
+  @Matches(/^\d+$/, { message: "Telefone deve conter apenas números" })
   phone: string;
 
   @IsNotEmpty()

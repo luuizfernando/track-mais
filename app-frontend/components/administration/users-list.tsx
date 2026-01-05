@@ -15,6 +15,12 @@ import {
 } from "@/components/ui/table"
 import { AdminListCard } from "./list-card"
 import { TAB_CONFIG } from "./config"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 
 type ApiUser = {
   id: number
@@ -31,6 +37,7 @@ type ApiResponse = {
 }
 
 interface UserRow {
+  id: number
   name: string
   username: string
   role: string
@@ -62,6 +69,12 @@ export function UsersList({ onAdd }: UsersListProps) {
   const [page, setPage] = useState(0)
   const limit = 13
   const [hasNext, setHasNext] = useState(false)
+  const { toast } = useToast()
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [selected, setSelected] = useState<UserRow | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [editForm, setEditForm] = useState<{ name: string; username: string; role: "admin" | "user"; password?: string } | null>(null)
 
   const fetchUsers = async (offset: number) => {
     try {
@@ -75,6 +88,7 @@ export function UsersList({ onAdd }: UsersListProps) {
 
       const list = (res.data?.data ?? []).flat()
       const mapped: UserRow[] = list.map((u) => ({
+        id: u.id,
         name: u.name,
         username: u.username,
         role: ROLE_LABEL[u.role] ?? u.role,
@@ -100,6 +114,58 @@ export function UsersList({ onAdd }: UsersListProps) {
   useEffect(() => {
     fetchUsers(page * limit)
   }, [page])
+
+  const openEdit = (user: UserRow) => {
+    setSelected(user)
+    const roleKey = user.role.includes("Admin") ? "admin" : "user"
+    setEditForm({ name: user.name, username: user.username, role: roleKey as "admin" | "user" })
+    setEditOpen(true)
+  }
+
+  const openDelete = (user: UserRow) => {
+    setSelected(user)
+    setConfirmDelete(true)
+  }
+
+  const submitEdit = async () => {
+    if (!selected || !editForm) return
+    try {
+      const token = localStorage.getItem("token")
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL}${USERS_ROUTE}/${selected.id}`,
+        {
+          name: editForm.name,
+          username: editForm.username,
+          role: editForm.role,
+          password: editForm.password,
+        },
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+      )
+      setRows((prev) => prev.map((r) => (r.id === selected.id ? { ...r, name: editForm.name, username: editForm.username, role: ROLE_LABEL[editForm.role] } : r)))
+      toast?.({ description: "Usuario atualizado com sucesso!", variant: "success" })
+      setEditOpen(false)
+      setSelected(null)
+    } catch (e: any) {
+      toast?.({ description: e?.response?.data?.message || "Erro ao atualizar usuario" })
+    }
+  }
+
+  const confirmDeleteAction = async () => {
+    if (!selected) return
+    try {
+      const token = localStorage.getItem("token")
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL}${USERS_ROUTE}/${selected.id}`,
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+      )
+      setRows((prev) => prev.filter((r) => r.id !== selected.id))
+      toast?.({ description: "Usuario deletado com sucesso!", variant: "success" })
+      setConfirmDelete(false)
+      setSelected(null)
+    } catch (e: any) {
+      toast?.({ description: e?.response?.data?.message || "Erro ao deletar usuario" })
+    }
+  }
 
   if (loading) {
     return (
@@ -139,7 +205,7 @@ export function UsersList({ onAdd }: UsersListProps) {
         </TableHeader>
         <TableBody>
           {rows.map((user, index) => (
-            <TableRow key={`${user.username}-${index}`} className="text-gray-700">
+            <TableRow key={`${user.id}-${index}`} className="text-gray-700">
               <TableCell className="font-medium text-gray-900">{user.name}</TableCell>
               <TableCell>{user.username}</TableCell>
               <TableCell>{user.role}</TableCell>
@@ -148,10 +214,10 @@ export function UsersList({ onAdd }: UsersListProps) {
               </TableCell>
               <TableCell>
                 <div className="flex items-center justify-end gap-2">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900" onClick={() => openEdit(user)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900" onClick={() => openDelete(user)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -179,6 +245,58 @@ export function UsersList({ onAdd }: UsersListProps) {
           Próximo →
         </Button>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-xl border-yellow-200">
+          <DialogHeader>
+            <DialogTitle className="text-yellow-800">Editar Usuario</DialogTitle>
+          </DialogHeader>
+          {editForm ? (
+            <div className="space-y-3">
+              <div>
+                <Label>Nome</Label>
+                <Input value={editForm.name} onChange={(e) => setEditForm((prev) => (prev ? { ...prev, name: e.target.value } : prev))} />
+              </div>
+              <div>
+                <Label>Username</Label>
+                <Input value={editForm.username} onChange={(e) => setEditForm((prev) => (prev ? { ...prev, username: e.target.value } : prev))} />
+              </div>
+              <div>
+                <Label>Perfil</Label>
+                <Select value={editForm.role} onValueChange={(v) => setEditForm((prev) => (prev ? { ...prev, role: v as "admin" | "user" } : prev))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="user">Usuário Comum</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Senha (opcional)</Label>
+                <Input type="password" value={editForm.password ?? ""} onChange={(e) => setEditForm((prev) => (prev ? { ...prev, password: e.target.value } : prev))} />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+                <Button onClick={submitEdit}>Salvar</Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent className="border-yellow-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deseja deletar este usuario?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-yellow-300 text-yellow-800 hover:bg-yellow-100">Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-yellow-500 hover:bg-yellow-600 text-white" onClick={confirmDeleteAction}>Deletar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminListCard>
   )
 }

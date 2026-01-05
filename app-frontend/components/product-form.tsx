@@ -122,10 +122,10 @@ export function ProductForm({ onCancel, onSuccess }: ProdutoFormProps = {}) {
       <CardHeader>
         <CardTitle className="text-2xl font-semibold text-gray-900">Cadastrar Produto</CardTitle>
       </CardHeader>
-      <CardContent className="p-6 md:p-8">
+      <CardContent className="p-4 md:p-6 lg:p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* First row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <div>
               <Input
                 placeholder="Código"
@@ -153,7 +153,7 @@ export function ProductForm({ onCancel, onSuccess }: ProdutoFormProps = {}) {
           </div>
 
           {/* Second row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <div>
               <Input
                 placeholder="Peso"
@@ -179,7 +179,7 @@ export function ProductForm({ onCancel, onSuccess }: ProdutoFormProps = {}) {
           </div>
 
           {/* Third row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <div>
               <Input
                 placeholder="Validade"

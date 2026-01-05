@@ -177,12 +177,12 @@ export function ClientForm({ onCancel, onSuccess }: ClientFormProps = {}) {
           Cadastrar Cliente
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-6 md:p-8">
+      <CardContent className="p-4 md:p-6 lg:p-8">
         {errors.geral && (
           <div className="mb-4 text-red-600 font-medium">{errors.geral}</div>
         )}
         <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <div className="flex flex-col space-y-1">
               <label
                 htmlFor="code"
@@ -236,7 +236,7 @@ export function ClientForm({ onCancel, onSuccess }: ClientFormProps = {}) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <div className="flex flex-col space-y-1">
               <label
                 htmlFor="cnpj_cpf"
@@ -275,7 +275,7 @@ export function ClientForm({ onCancel, onSuccess }: ClientFormProps = {}) {
                 htmlFor="corporate_network"
                 className="text-sm font-medium text-gray-700"
               >
-                Rede 
+                Rede
               </label>
               <Input
                 id="corporate_network"
@@ -293,7 +293,7 @@ export function ClientForm({ onCancel, onSuccess }: ClientFormProps = {}) {
           {/* Contact Section */}
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Contato</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="flex flex-col space-y-1">
                 <label
                   htmlFor="email"
@@ -341,7 +341,7 @@ export function ClientForm({ onCancel, onSuccess }: ClientFormProps = {}) {
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Endereço</h3>
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div className="flex flex-col space-y-1">
                   <label
                     htmlFor="state"
@@ -427,7 +427,7 @@ export function ClientForm({ onCancel, onSuccess }: ClientFormProps = {}) {
             <h3 className="text-lg font-medium text-gray-900 mb-4">
               Pagamento
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="flex flex-col space-y-1">
                 <label
                   htmlFor="payment_method"

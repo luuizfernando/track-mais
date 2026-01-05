@@ -1,9 +1,14 @@
-import { role } from '@prisma/client';
-import { IsNotEmpty, IsString, MinLength, MaxLength, Matches, IsEnum } from 'class-validator';
-
+import { role } from "@prisma/client";
+import {
+  IsNotEmpty,
+  IsString,
+  MinLength,
+  MaxLength,
+  Matches,
+  IsEnum,
+} from "class-validator";
 
 export class CreateUserDto {
-
   @IsNotEmpty()
   @IsString()
   @MaxLength(30)
@@ -14,7 +19,8 @@ export class CreateUserDto {
   @MinLength(3)
   @MaxLength(20)
   @Matches(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/, {
-    message: 'O nome de usuário só pode conter letras e pontos. Ex: Victor.Leal',
+    message:
+      "O nome de usuário só pode conter letras e pontos. Ex: Victor.Leal",
   })
   username: string;
 
@@ -25,6 +31,6 @@ export class CreateUserDto {
   password: string;
 
   @IsNotEmpty()
-  @IsEnum(role, { message: 'Cargo inválido' })
+  @IsEnum(role, { message: "Cargo inválido" })
   role: role;
 }

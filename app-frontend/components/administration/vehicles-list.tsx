@@ -14,6 +14,11 @@ import {
 } from "@/components/ui/table";
 import { AdminListCard } from "./list-card";
 import { TAB_CONFIG } from "./config";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 
 interface ApiVehicle {
   id: number;
@@ -42,6 +47,12 @@ export function VehiclesList({ onAdd }: VehiclesListProps) {
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const limit = 13;
+  const { toast } = useToast();
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [selected, setSelected] = useState<ApiVehicle | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editForm, setEditForm] = useState<ApiVehicle | null>(null);
 
   useEffect(() => {
     const fetchVehicles = async () => {
@@ -158,6 +169,7 @@ export function VehiclesList({ onAdd }: VehiclesListProps) {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
+                    onClick={() => { setSelected(vehicle); setEditForm({ ...vehicle }); setEditOpen(true); }}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -165,6 +177,7 @@ export function VehiclesList({ onAdd }: VehiclesListProps) {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
+                    onClick={() => { setSelected(vehicle); setConfirmDelete(true); }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -192,6 +205,91 @@ export function VehiclesList({ onAdd }: VehiclesListProps) {
           Proximo
         </Button>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-xl border-yellow-200">
+          <DialogHeader>
+            <DialogTitle className="text-yellow-800">Editar Veiculo</DialogTitle>
+          </DialogHeader>
+          {editForm ? (
+            <div className="space-y-3">
+              <div>
+                <Label>Modelo</Label>
+                <Input value={editForm.model} onChange={(e) => setEditForm((prev) => (prev ? { ...prev, model: e.target.value } : prev))} />
+              </div>
+              <div>
+                <Label>Placa</Label>
+                <Input value={editForm.plate} onChange={(e) => setEditForm((prev) => (prev ? { ...prev, plate: e.target.value } : prev))} />
+              </div>
+              <div>
+                <Label>Telefone</Label>
+                <Input value={editForm.phone} onChange={(e) => setEditForm((prev) => (prev ? { ...prev, phone: e.target.value } : prev))} />
+              </div>
+              <div>
+                <Label>Carga Max.</Label>
+                <Input value={String(editForm.maximumLoad ?? "")} onChange={(e) => setEditForm((prev) => (prev ? { ...prev, maximumLoad: Number(e.target.value) || null } : prev))} />
+              </div>
+              <div>
+                <Label>Observacoes</Label>
+                <Input value={editForm.description ?? ""} onChange={(e) => setEditForm((prev) => (prev ? { ...prev, description: e.target.value } : prev))} />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+                <Button onClick={async () => {
+                  if (!selected || !editForm) return;
+                  try {
+                    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+                    await axios.patch(
+                      `${process.env.NEXT_PUBLIC_API_URL}/vehicles/${selected.id}`,
+                      {
+                        model: editForm.model,
+                        plate: editForm.plate,
+                        phone: editForm.phone,
+                        maximumLoad: editForm.maximumLoad,
+                        description: editForm.description,
+                      },
+                      token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+                    );
+                    setVehicles((prev) => prev.map((v) => (v.id === selected.id ? { ...v, ...editForm } : v)));
+                    toast?.({ description: "Veiculo atualizado com sucesso!", variant: "success" });
+                    setEditOpen(false);
+                    setSelected(null);
+                  } catch (e: any) {
+                    toast?.({ description: e?.response?.data?.message || "Erro ao atualizar veiculo" });
+                  }
+                }}>Salvar</Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent className="border-yellow-200">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deseja deletar este veiculo?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-yellow-300 text-yellow-800 hover:bg-yellow-100">Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-yellow-500 hover:bg-yellow-600 text-white" onClick={async () => {
+              if (!selected) return;
+              try {
+                const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+                await axios.delete(
+                  `${process.env.NEXT_PUBLIC_API_URL}/vehicles/${selected.id}`,
+                  token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+                );
+                setVehicles((prev) => prev.filter((v) => v.id !== selected.id));
+                toast?.({ description: "Veiculo deletado com sucesso!", variant: "success" });
+                setConfirmDelete(false);
+                setSelected(null);
+              } catch (e: any) {
+                toast?.({ description: e?.response?.data?.message || "Erro ao deletar veiculo" });
+              }
+            }}>Deletar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminListCard>
   );
 }

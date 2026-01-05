@@ -108,9 +108,9 @@ export function UsuarioForm({ onCancel, onSuccess }: UsuarioFormProps = {}) {
       <CardHeader className="pb-4">
         <CardTitle className="text-2xl font-semibold text-gray-900">Cadastrar Usuario</CardTitle>
       </CardHeader>
-      <CardContent className="p-6 md:p-8">
+      <CardContent className="p-4 md:p-6 lg:p-8">
         <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <div className="flex flex-col gap-2">
               <Label htmlFor="nome" className="text-sm font-medium text-gray-600">Nome</Label>
               <Input
@@ -133,7 +133,7 @@ export function UsuarioForm({ onCancel, onSuccess }: UsuarioFormProps = {}) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <div className="flex flex-col gap-2">
               <Label htmlFor="perfil" className="text-sm font-medium text-gray-600">Cargo</Label>
               <Select

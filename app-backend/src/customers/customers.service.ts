@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { CreateCustomerDto } from "./dto/create-customer.dto";
 import { UpdateCustomerDto } from "./dto/update-customer.dto";
 import { PrismaService } from "src/prisma/prisma.service";
@@ -47,7 +48,7 @@ export class CustomersService {
       }
       throw new HttpException(
         "Falha ao cadastrar o cliente.",
-        HttpStatus.BAD_REQUEST
+        HttpStatus.BAD_REQUEST,
       );
     }
   }
@@ -74,7 +75,7 @@ export class CustomersService {
     } catch (err) {
       throw new HttpException(
         "Erro ao buscar clientes.",
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -90,7 +91,7 @@ export class CustomersService {
       if (!customer) {
         throw new HttpException(
           "Esse cliente não está na nossa base de dados.",
-          HttpStatus.CONFLICT
+          HttpStatus.CONFLICT,
         );
       }
 
@@ -126,7 +127,7 @@ export class CustomersService {
     } catch (err) {
       throw new HttpException(
         "Falha ao atualizar o cliente.",
-        HttpStatus.BAD_REQUEST
+        HttpStatus.BAD_REQUEST,
       );
     }
   }
@@ -140,7 +141,7 @@ export class CustomersService {
       if (!customer) {
         throw new HttpException(
           "Esse cliente não está na nossa base de dados.",
-          HttpStatus.BAD_REQUEST
+          HttpStatus.BAD_REQUEST,
         );
       }
 
@@ -150,9 +151,23 @@ export class CustomersService {
 
       return { message: "Cliente deletado com sucesso!" };
     } catch (err) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
+
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2003"
+      ) {
+        throw new HttpException(
+          "Nao é possível deletar clientes vinculados a relatórios.",
+          HttpStatus.CONFLICT,
+        );
+      }
+
       throw new HttpException(
         "Falha ao deletar Cliente.",
-        HttpStatus.BAD_REQUEST
+        HttpStatus.BAD_REQUEST,
       );
     }
   }

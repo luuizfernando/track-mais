@@ -137,7 +137,7 @@ export function Sidebar() {
   return (
     <div
       className={`bg-white border-r border-gray-300 flex flex-col transition-all duration-300 ease-in-out ${
-        collapsed ? "w-20" : "w-56"
+        collapsed ? "w-16 md:w-20" : "w-56 md:w-64"
       }`}
     >
       {/* Logo e Botão de Toggle */}

@@ -15,11 +15,22 @@ import {
   DialogContent,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 // Assuma que OnboardingForm.tsx está na mesma pasta
 import OnboardingForm from "./multistep-form";
 
 export function ReportsPage() {
   const [activeTab, setActiveTab] = useState("controle");
+  const [createOpen, setCreateOpen] = useState(false);
   const [filters, setFilters] = useState({
     nomeProduto: "",
     lote: "",
@@ -31,11 +42,12 @@ export function ReportsPage() {
   // Estado para tabela de relatórios
   type ApiDailyReport = {
     id: number;
-    invoiceNumber: number;
+    invoiceNumber: string | number;
     customerCode: number | string; // pode vir como string se BigInt serializado
-    products: Array<{ code: number | string; quantity: number; description?: string }>;
-    shipmentDate: string; // ISO
-    productionDate?: string; // ISO
+    products: Array<{ code: number | string; quantity: number; description?: string; sifOrSisbi?: string; productTemperature?: number; productionDate?: string }>;
+    shipmentDate: string; // legado
+    productionDate?: string; // ISO (agregado)
+    fillingDate?: string; // ISO (momento do preenchimento)
     userId: number;
     deliverVehicle?: string | null;
     hasGoodSanitaryCondition: boolean;
@@ -59,26 +71,44 @@ export function ReportsPage() {
     username: string;
   };
 
+  // Registros mensais (DIPOVA)
+  type ApiMonthlyReport = {
+    id: number;
+    quantity: string | number; // Decimal vem como string
+    destination: string;
+    temperature: string | number;
+    deliverer: string;
+    productionDate: string; // ISO
+    shipmentDate: string; // ISO
+    productId: number; // código do produto
+    customersId: number;
+  };
+
   type ReportRow = {
     reportId: number;
-    invoiceNumber: number;
+    invoiceNumber: string;
+    customerCode?: number;
     clientName: string;
-    productCode: string;
-    productName: string;
-    shipmentDate: string;
-    productionDate: string;
-    shipmentDateIso: string;
-    productionDateIso: string;
-    quantity: number;
     destination: string;
     userId: number;
     userName?: string;
     deliverVehicle?: string | null;
     hasGoodSanitaryCondition: boolean;
     productTemperature: number;
+    fillingDate: string;
+    fillingDateIso: string;
+    products: Array<{
+      productCode: string;
+      productName: string;
+      quantity: number;
+      productionDate: string;
+      productTemperature?: number;
+      sifOrSisbi?: string;
+    }>;
   };
 
   const [rows, setRows] = useState<ReportRow[]>([]);
+  const [monthly, setMonthly] = useState<ApiMonthlyReport[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedRowKeys, setExpandedRowKeys] = useState<Set<string>>(new Set());
@@ -100,16 +130,17 @@ export function ReportsPage() {
     }
 
     if (!iso) return "N/A";
-    // Tenta parse padrão
+
+    // Prioriza o parse de AAAA-MM-DD (com ou sem parte de horário), evitando shift por timezone
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+    if (m) {
+      const dLocal = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      if (!isNaN(dLocal.getTime())) return dLocal.toLocaleDateString("pt-BR");
+    }
+
+    // Fallback: tenta parse padrão
     const d1 = new Date(iso);
     if (!isNaN(d1.getTime())) return d1.toLocaleDateString("pt-BR");
-
-    // Fallback para formato YYYY-MM-DD
-    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) {
-      const d2 = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-      if (!isNaN(d2.getTime())) return d2.toLocaleDateString("pt-BR");
-    }
 
     // Último recurso: retorna string original
     return iso;
@@ -121,17 +152,23 @@ export function ReportsPage() {
     if (input instanceof Date) {
       d = input;
     } else if (typeof input === "string") {
-      const tryIso = new Date(input);
-      if (!isNaN(tryIso.getTime())) {
-        d = tryIso;
+      // Prioriza AAAA-MM-DD (com ou sem horário) para evitar timezone
+      const m = input.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+      if (m) {
+        d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
       } else {
-        const m1 = input.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-        if (m1) {
-          d = new Date(Number(m1[3]), Number(m1[2]) - 1, Number(m1[1]));
+        const tryIso = new Date(input);
+        if (!isNaN(tryIso.getTime())) {
+          d = tryIso;
         } else {
-          const m2 = input.match(/^(\d{4})-(\d{2})-(\d{2})/);
-          if (m2) {
-            d = new Date(Number(m2[1]), Number(m2[2]) - 1, Number(m2[3]));
+          const m1 = input.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          if (m1) {
+            d = new Date(Number(m1[3]), Number(m1[2]) - 1, Number(m1[1]));
+          } else {
+            const m2 = input.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m2) {
+              d = new Date(Number(m2[1]), Number(m2[2]) - 1, Number(m2[3]));
+            }
           }
         }
       }
@@ -156,11 +193,12 @@ export function ReportsPage() {
         const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
         // Buscar relatórios, clientes e produtos em paralelo
-        const [repRes, custRes, prodRes, usersRes] = await Promise.all([
+        const [repRes, custRes, prodRes, usersRes, monthlyRes] = await Promise.all([
           axios.get<ApiDailyReport[]>(`${baseURL}/daily-report`, { headers }),
           axios.get<{ data: ApiCustomer[], limit: number, offset: number, total?: number }>(`${baseURL}/customers`, { headers }),
           axios.get<{ data: ApiProduct[], limit: number, offset: number, total?: number }>(`${baseURL}/products`, { headers }),
           axios.get<{ data: ApiUser[][], limit: number, offset: number }>(`${baseURL}/usuarios?limit=100`, { headers }),
+          axios.get<ApiMonthlyReport[]>(`${baseURL}/monthly-report`, { headers }),
         ]);
 
         const customers = Array.isArray(custRes.data)
@@ -171,6 +209,7 @@ export function ReportsPage() {
           : (prodRes.data?.data ?? []);
         const reports = repRes.data || [];
         const users = (usersRes.data?.data?.[0] ?? []) as ApiUser[];
+        const monthlyReports = Array.isArray(monthlyRes.data) ? monthlyRes.data : [];
 
         // Mapas auxiliares
         const customerByCode = new Map<number, ApiCustomer>();
@@ -182,47 +221,52 @@ export function ReportsPage() {
         const userById = new Map<number, ApiUser>();
         users.forEach((u) => userById.set(Number(u.id), u));
 
-        // Para cada relatório, criar uma linha por produto
+        // Para cada relatório, criar UMA linha agregada por cliente no dia (fillingDate)
         const builtRows: ReportRow[] = [];
         for (const r of reports) {
-          const invoice = Number(r.invoiceNumber);
+          const invoice = String(r.invoiceNumber);
           const cust = customerByCode.get(Number(r.customerCode));
           const clientName = cust?.legal_name ?? "N/A";
           const destination = cust?.state ?? "N/A";
-          const shipDateIso = String(r.shipmentDate);
-          const prodDateIso = String(r.productionDate ?? r.shipmentDate);
-          const shipDate = formatDate(shipDateIso);
-          const prodDate = formatDate(prodDateIso);
-
+          const fillingIso = String(r.fillingDate ?? r.productionDate ?? r.shipmentDate);
           const items = Array.isArray(r.products) ? r.products : [];
+
+          const productRows: ReportRow["products"] = [];
           for (const it of items) {
             const codeNum = Number((it as any)?.code);
             const prod = productByCode.get(codeNum);
             const prodName = prod?.description ?? it?.description ?? "N/A";
             const qty = Number((it as any)?.quantity) || 0;
-
-            builtRows.push({
-              reportId: Number(r.id),
-              invoiceNumber: invoice,
-              clientName,
+            const prodDateIso = String((it as any)?.productionDate ?? r.productionDate ?? r.shipmentDate);
+            productRows.push({
               productCode: String((it as any)?.code ?? ""),
               productName: prodName,
-              shipmentDate: shipDate, // também usado como Data Prod/Lote conforme instrução
-              productionDate: prodDate,
-              shipmentDateIso: shipDateIso,
-              productionDateIso: prodDateIso,
               quantity: qty,
-              destination,
-              userId: Number(r.userId),
-              userName: userById.get(Number(r.userId))?.name ?? "—",
-              deliverVehicle: r.deliverVehicle ?? null,
-              hasGoodSanitaryCondition: !!r.hasGoodSanitaryCondition,
-              productTemperature: Number(r.productTemperature ?? 0),
+              productionDate: formatDate(prodDateIso),
+              productTemperature: Number((it as any)?.productTemperature ?? r.productTemperature ?? 0),
+              sifOrSisbi: String((it as any)?.sifOrSisbi ?? "") || undefined,
             });
           }
+
+          builtRows.push({
+            reportId: Number(r.id),
+            invoiceNumber: invoice,
+            customerCode: Number(r.customerCode),
+            clientName,
+            destination,
+            userId: Number(r.userId),
+            userName: userById.get(Number(r.userId))?.name ?? "—",
+            deliverVehicle: r.deliverVehicle ?? null,
+            hasGoodSanitaryCondition: !!r.hasGoodSanitaryCondition,
+            productTemperature: Number(r.productTemperature ?? 0),
+            fillingDate: formatDate(fillingIso),
+            fillingDateIso: fillingIso,
+            products: productRows,
+          });
         }
 
         setRows(builtRows);
+        setMonthly(monthlyReports);
       } catch (e: any) {
         console.error(e);
         const msg = e?.response?.data?.message || e?.message || "Erro ao carregar relatórios.";
@@ -267,9 +311,89 @@ export function ReportsPage() {
     });
   };
 
-  // Agrupamento por mês (Data Expe.)
+  // ====== Edição/Exclusão ======
+  const [editOpen, setEditOpen] = useState(false);
+  const [editRow, setEditRow] = useState<ReportRow | null>(null);
+  const [customersState, setCustomersState] = useState<ApiCustomer[]>([]);
+  const [productsState, setProductsState] = useState<ApiProduct[]>([]);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  // Armazenar clientes/produtos carregados para o modal
+  useEffect(() => {
+    (async () => {
+      try {
+        const baseURL = process.env.NEXT_PUBLIC_API_URL;
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+        const [custRes, prodRes] = await Promise.all([
+          axios.get<{ data: ApiCustomer[] }>(`${baseURL}/customers?limit=20`, { headers }),
+          axios.get<{ data: ApiProduct[] }>(`${baseURL}/products?limit=20`, { headers }),
+        ]);
+        setCustomersState(custRes.data?.data ?? []);
+        setProductsState(prodRes.data?.data ?? []);
+      } catch (_) {
+        // silencioso; não bloquear a página
+      }
+    })();
+  }, []);
+
+  const parsePtBrToISO = (d: string) => {
+    const m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return d; // retornar como veio se já está ISO
+    return `${m[3]}-${m[2]}-${m[1]}`;
+  };
+
+  const openEdit = (row: ReportRow) => {
+    setEditRow({ ...row });
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editRow) return;
+    try {
+      const baseURL = process.env.NEXT_PUBLIC_API_URL;
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+      const payload = {
+        invoiceNumber: editRow.invoiceNumber,
+        customerGroups: [
+          {
+            customerCode: Number(editRow.customerCode || 0),
+            items: editRow.products.map((p) => ({
+              code: Number(p.productCode),
+              quantity: Number(p.quantity),
+              description: p.productName,
+              sifOrSisbi: p.sifOrSisbi ?? "NA",
+              productTemperature: Number(p.productTemperature ?? 0),
+              productionDate: parsePtBrToISO(p.productionDate),
+            })),
+          },
+        ],
+      };
+
+      await axios.patch(`${baseURL}/daily-report/${editRow.reportId}`, payload, { headers });
+
+      // Atualizar estado local
+      setRows((prev) => prev.map((r) => (r.reportId === editRow.reportId ? { ...editRow } : r)));
+      setEditOpen(false);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || "Falha ao atualizar relatório.";
+      alert(msg);
+    }
+  };
+
+  const handleDelete = async (reportId: number) => {
+    // Abre modal de confirmação
+    setPendingDeleteId(reportId);
+    setDeleteOpen(true);
+  };
+
+  // Agrupamento por mês (Data de preenchimento)
   const groups = rows.reduce<Record<string, ReportRow[]>>((acc, row) => {
-    const k = getMonthKey(row.shipmentDateIso);
+    const k = getMonthKey(row.fillingDateIso);
     if (!acc[k]) acc[k] = [];
     acc[k].push(row);
     return acc;
@@ -279,14 +403,54 @@ export function ReportsPage() {
     // sort by YYYY-MM behind the scenes
     const parse = (key: string) => {
       const [mon, yr] = key.split("-");
-      const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
       const idx = months.findIndex((m) => m.toLowerCase() === mon.toLowerCase());
       return Number(yr) * 100 + (idx >= 0 ? idx : 0);
     };
     return parse(b) - parse(a);
   });
 
-  const sumQty = (arr: ReportRow[]) => arr.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+  // Estado de mês selecionado para DIPOVA, baseado na data de preenchimento
+  const [dipovaMonth, setDipovaMonth] = useState<string | null>(null);
+  useEffect(() => {
+    if (!dipovaMonth && orderedMonthKeys.length > 0) {
+      setDipovaMonth(orderedMonthKeys[0]);
+    }
+  }, [orderedMonthKeys, dipovaMonth]);
+
+  const sumQty = (arr: ReportRow[]) =>
+    arr.reduce((s, r) => s + r.products.reduce((sp, p) => sp + (Number(p.quantity) || 0), 0), 0);
+
+  const monthAbbr = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const formatMonthBr = (iso: string) => {
+    const m = iso.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})(?:[T\s].*)?$/);
+    let d: Date | null = null;
+    if (m) d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    else {
+      const tryD = new Date(iso);
+      if (!isNaN(tryD.getTime())) d = tryD; else return iso;
+    }
+    const mm = d.getMonth();
+    const yy = d.getFullYear() % 100;
+    return `${monthAbbr[mm]}-${yy}`;
+  };
+
+  // Formata a label exibida nas tabs de mês (Mon-YY)
+  const formatChipLabel = (key: string) => {
+    const [mon, yr] = key.split("-");
+    const yr2 = String(yr).slice(-2);
+    return `${mon}-${yr2}`;
+  };
+  const isSameMonthYear = (iso: string, ref: Date) => {
+    const m = iso.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})(?:[T\s].*)?$/);
+    let d: Date | null = null;
+    if (m) d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    else {
+      const tryD = new Date(iso);
+      if (!isNaN(tryD.getTime())) d = tryD; else return false;
+    }
+    return d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
+  };
 
   return (
     <div className="space-y-6">
@@ -295,7 +459,7 @@ export function ReportsPage() {
         <div className="text-xl font-semibold text-gray-900">Relatórios</div>
 
         {/* ===== 2. IMPLEMENTAÇÃO DO DIALOG ===== */}
-        <Dialog>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button className="bg-yellow-400 hover:bg-yellow-500 text-black font-medium px-6">
               + Novo Registro
@@ -307,7 +471,7 @@ export function ReportsPage() {
               max-w-lg é para corresponder ao estilo do formulário.
               O DialogContent já tem scroll automático.
             */}
-            <OnboardingForm />
+            <OnboardingForm onSuccess={() => setCreateOpen(false)} />
           </DialogContent>
         </Dialog>
         {/* ===== FIM DA IMPLEMENTAÇÃO ===== */}
@@ -336,7 +500,7 @@ export function ReportsPage() {
           <Filter className="h-4 w-4 text-gray-500" />
           <span>Filtros</span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
           <div className="flex flex-col gap-1">
             <Label
               htmlFor="filtro-nome-produto"
@@ -389,21 +553,21 @@ export function ReportsPage() {
                   <tbody className="divide-y divide-gray-200">
                     {loading && (
                       <tr>
-                        <td className="px-4 py-3 text-sm" colSpan={8}>
+                        <td className="px-4 py-3 text-sm" colSpan={4}>
                           Carregando...
                         </td>
                       </tr>
                     )}
                     {error && !loading && (
                       <tr>
-                        <td className="px-4 py-3 text-sm text-red-600" colSpan={8}>
+                        <td className="px-4 py-3 text-sm text-red-600" colSpan={4}>
                           {error}
                         </td>
                       </tr>
                     )}
                     {!loading && !error && rows.length === 0 && (
                       <tr>
-                        <td className="px-4 py-3 text-sm" colSpan={8}>
+                        <td className="px-4 py-3 text-sm" colSpan={4}>
                           Nenhum relatório encontrado.
                         </td>
                       </tr>
@@ -417,7 +581,7 @@ export function ReportsPage() {
                         <>
                           {/* Linha de resumo do mês */}
                           <tr key={`sum-${mk}`} className="bg-gray-100 border-b">
-                            <td colSpan={8} className="px-4 py-3 text-sm text-gray-900">
+                            <td colSpan={4} className="px-4 py-3 text-sm text-gray-900">
                               <div className="flex items-center gap-4">
                                 <button
                                   aria-label={isExpanded ? "Recolher" : "Expandir"}
@@ -439,10 +603,6 @@ export function ReportsPage() {
                             <tr className="bg-gray-50 border-b">
                               <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Nº da NF</th>
                               <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Cliente</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Produto</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Data Expe.</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Quantidade</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Data Prod/Lote</th>
                               <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Destino</th>
                               <th className="px-4 py-3 text-center text-sm font-medium text-gray-900">Ações</th>
                             </tr>
@@ -450,7 +610,7 @@ export function ReportsPage() {
 
                           {/* Linhas detalhadas do mês */}
                           {isExpanded && groupRows.map((row, idx) => {
-                            const rkey = `${row.reportId}-${row.productCode}-${idx}`;
+                            const rkey = `${row.reportId}-${idx}`;
                             const rExpanded = expandedRowKeys.has(rkey);
                             const userName = row.userName ?? "—";
                             return (
@@ -472,28 +632,14 @@ export function ReportsPage() {
                                     {row.clientName}
                                   </td>
                                   <td className="px-4 py-3 text-sm text-gray-900">
-                                    <div className="flex items-center gap-2">
-                                      <span>{row.productName}</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-900">
-                                    {row.shipmentDate}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-900">
-                                    {row.quantity}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-900">
-                                    {row.productionDate}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-900">
                                     {row.destination}
                                   </td>
                                   <td className="px-4 py-3 text-center">
                                     <div className="flex justify-center space-x-2">
-                                      <Button variant="ghost" size="sm" className="h-8 px-2">
+                                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => openEdit(row)} aria-label="Editar relatório">
                                         <Edit className="h-4 w-4" />
                                       </Button>
-                                      <Button variant="ghost" size="sm" className="h-8 px-2">
+                                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => handleDelete(row.reportId)} aria-label="Excluir relatório">
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
@@ -502,8 +648,12 @@ export function ReportsPage() {
 
                                 {rExpanded && (
                                   <tr key={`${rkey}-details`} className="bg-gray-50">
-                                    <td colSpan={8} className="px-4 py-3 text-sm text-gray-900">
-                                      <div className="grid grid-cols-5 gap-6">
+                                    <td colSpan={4} className="px-4 py-3 text-sm text-gray-900">
+                                      <div className="mb-3 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                                        <div>
+                                          <div className="text-gray-600">Data de preenchimento</div>
+                                          <div className="font-medium">{row.fillingDate ?? "—"}</div>
+                                        </div>
                                         <div>
                                           <div className="text-gray-600">Placa do veículo</div>
                                           <div className="font-medium">{row.deliverVehicle ?? "—"}</div>
@@ -516,14 +666,31 @@ export function ReportsPage() {
                                             <span className="inline-flex items-center px-2 py-0.5 rounded border border-red-500 text-red-600">Não conforme</span>
                                           )}
                                         </div>
-                                        <div>
-                                          <div className="text-gray-600">Temperatura</div>
-                                          <div className="font-medium">{Number.isFinite(row.productTemperature) ? `${row.productTemperature}°` : "—"}</div>
-                                        </div>
-                                        <div>
-                                          <div className="text-gray-600">Responsável pelo preenchimento</div>
-                                          <div className="font-medium">{/* Nome será resolvido no backend/usuario map se necessário */}</div>
-                                        </div>
+                                      </div>
+
+                                      <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                          <thead className="bg-gray-100 border">
+                                            <tr>
+                                              <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Produto</th>
+                                              <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Quantidade</th>
+                                              <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">SIF/SISBI</th>
+                                              <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Temperatura (°C)</th>
+                                              <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Data Prod/Lote</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y">
+                                            {row.products.map((p, i) => (
+                                              <tr key={`${rkey}-prod-${i}`}>
+                                                <td className="px-3 py-2">{p.productName}</td>
+                                                <td className="px-3 py-2">{p.quantity}</td>
+                                                <td className="px-3 py-2">{p.sifOrSisbi ?? "—"}</td>
+                                                <td className="px-3 py-2">{typeof p.productTemperature === "number" ? p.productTemperature : "—"}</td>
+                                                <td className="px-3 py-2">{p.productionDate}</td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
                                       </div>
                                     </td>
                                   </tr>
@@ -545,48 +712,413 @@ export function ReportsPage() {
         <TabsContent value="dipova" className="mt-6">
           <Card>
             <CardContent className="p-0">
+              {/* Seleção de mês da DIPOVA */}
+              <div className="px-4 py-3 border-b">
+                <Tabs value={dipovaMonth ?? ""} onValueChange={(v) => setDipovaMonth(v)}>
+                  <TabsList className="flex flex-wrap gap-2">
+                    {orderedMonthKeys.map((key) => (
+                      <TabsTrigger key={key} value={key} className="rounded-full">
+                        {formatChipLabel(key)}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-100 border-b">
                     <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
-                        Mês
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
-                        Total Expedições
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
-                        Total (kg)
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            onClick={handleExportPDF}
-                            variant="outline"
-                            size="sm"
-                            className="h-8 px-3 text-xs bg-transparent"
-                          >
-                            Gerar PDF
-                          </Button>
-                          <Button
-                            onClick={handleExportExcel}
-                            variant="outline"
-                            size="sm"
-                            className="h-8 px-3 text-xs bg-transparent"
-                          >
-                            Gerar Excel
-                          </Button>
-                        </div>
-                      </th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Produto</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Data de produção/lote</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Data da expedição</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Quant.</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Destino</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Temp.</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Entregador/caminhão</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200"></tbody>
+                  <tbody className="divide-y divide-gray-200">
+                    {(() => {
+                      if (loading) {
+                        return (<tr><td className="px-3 py-2 text-sm" colSpan={7}>Carregando...</td></tr>);
+                      }
+                      if (error) {
+                        return (<tr><td className="px-3 py-2 text-sm text-red-600" colSpan={7}>{error}</td></tr>);
+                      }
+
+                      // Request 1: Usar productsState como a fonte da verdade.
+                      // Precisamos que o productsState esteja carregado.
+                      if (!productsState || productsState.length === 0) {
+                        return (<tr><td className="px-3 py-2 text-sm" colSpan={7}>Nenhum produto cadastrado.</td></tr>);
+                      }
+
+                      // Helper: Correção para Request 2 (Cálculo de Quantidade)
+                      // Esta função analisa corretamente uma string numérica.
+                      const parseQuantity = (q: any): number => {
+                        if (q === null || q === undefined) return 0;
+                        // Se já for um número, retorne
+                        if (typeof q === 'number') return q;
+
+                        // Tenta converter para string
+                        let s: string;
+                        try {
+                          s = String(q).trim();
+                        } catch (e) {
+                          return 0; // Falha ao converter
+                        }
+
+                        if (!s) return 0; // String vazia
+
+                        const hasComma = s.includes(',');
+                        const hasDot = s.includes('.');
+
+                        // Caso 1: Formato "1.234,56" (pt-BR com milhar)
+                        if (hasComma && hasDot && s.lastIndexOf('.') < s.lastIndexOf(',')) {
+                          s = s.replace(/\./g, '').replace(/,/g, '.'); // "1.234,56" -> "1234.56"
+                        }
+                        // Caso 2: Formato "1,234.56" (en-US com milhar)
+                        else if (hasComma && hasDot && s.lastIndexOf(',') < s.lastIndexOf('.')) {
+                          s = s.replace(/,/g, ''); // "1,234.56" -> "1234.56"
+                        }
+                        // Caso 3: Formato "1234,56" (pt-BR simples)
+                        else if (hasComma && !hasDot) {
+                          s = s.replace(/,/g, '.'); // "1234,56" -> "1234.56"
+                        }
+                        // Caso 4: Formato "1234.56" (padrão) ou "1234" (inteiro)
+                        // Nenhuma ação necessária, 'Number()' já entende.
+
+                        const n = Number(s);
+                        return isNaN(n) ? 0 : n;
+                      };
+
+                      // Criar um mapa de agregação para Quantidades com base nos relatórios diários carregados (rows)
+                      // Isso garante que a aba DIPOVA reflita imediatamente exclusões/edições feitas no frontend e persistidas no backend.
+                      const quantityPerProduct = new Map<number, number>();
+                      const selectedMonthKey = dipovaMonth ?? (orderedMonthKeys[0] ?? getMonthKey(new Date()));
+                      for (const r of rows) {
+                        // Considerar apenas o mês selecionado (data de preenchimento)
+                        if (getMonthKey(r.fillingDateIso) !== selectedMonthKey) continue;
+                        for (const p of r.products) {
+                          const productId = Number(p.productCode);
+                          const currentQty = quantityPerProduct.get(productId) || 0;
+                          const addQty = Number(p.quantity) || 0;
+                          quantityPerProduct.set(productId, currentQty + addQty);
+                        }
+                      }
+
+                      // Valores fixos do código original (pois não são específicos do produto)
+                      const abbrCurrent = formatMonthBr(new Date().toISOString());
+                      const defaultDest = 'N/A'; // Ou "Distrito Federal" se preferir
+                      const defaultTemp = '0 °C';
+                      const defaultDeliverer = 'Próprio';
+
+                      // Request 1: Fazer o loop sobre 'productsState' em vez de 'monthly'
+                      // Observação: usar um nome diferente de 'rows' para evitar sombra do estado 'rows' (ReportRow[])
+                      // Regra: ocultar produtos com quantidade 0 na tabela DIPOVA
+                      const filteredProducts = productsState.filter((product) => {
+                        const prodCode = Number(product.code);
+                        const qtyNum = quantityPerProduct.get(prodCode) || 0;
+                        return qtyNum > 0;
+                      });
+                      const tableRows = filteredProducts.map((product) => {
+                        const prodCode = Number(product.code);
+                        const prodName = product.description ?? `Produto ${prodCode}`;
+
+                        // Request 2: Obter a soma pré-calculada para este produto
+                        const qtyNum = quantityPerProduct.get(prodCode) || 0;
+
+                        // Como agregamos a quantidade, colunas como "Destino" perdem o
+                        // detalhe transacional. Manteremos os valores padrão que já
+                        // estavam no código.
+
+                        return (
+                          <tr key={`dipova-prod-${prodCode}`}>
+                            <td className="px-3 py-2">{prodName}</td>
+                            <td className="px-3 py-2">{abbrCurrent}</td>
+                            <td className="px-3 py-2">{abbrCurrent}</td>
+                            <td className="px-3 py-2">
+                              {/* Formata o número para o padrão pt-BR (ex: 1.234,50) */}
+                              {qtyNum.toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                              })}
+                            </td>
+                            <td className="px-3 py-2">{defaultDest}</td>
+                            <td className="px-3 py-2">{defaultTemp}</td>
+                            <td className="px-3 py-2">{defaultDeliverer}</td>
+                          </tr>
+                        );
+                      });
+
+                      // Soma total das quantidades exibidas
+                      const totalQty = Array.from(quantityPerProduct.values()).reduce((acc, n) => acc + (Number(n) || 0), 0);
+
+                      // Linha de rodapé com valor apenas em Quant.
+                      const footerRow = (
+                        <tr key="dipova-total" className="bg-gray-50">
+                          <td className="px-3 py-2"></td>
+                          <td className="px-3 py-2"></td>
+                          <td className="px-3 py-2"></td>
+                          <td className="px-3 py-2 font-semibold">
+                            {totalQty.toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="px-3 py-2"></td>
+                          <td className="px-3 py-2"></td>
+                          <td className="px-3 py-2"></td>
+                        </tr>
+                      );
+
+                      return [
+                        ...tableRows,
+                        footerRow,
+                      ];
+                    })()}
+                  </tbody>
                 </table>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Modal de edição */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl">
+          {editRow && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm">Nº da NF</Label>
+                  <Input
+                    value={String(editRow.invoiceNumber)}
+                    onChange={(e) =>
+                      setEditRow((prev) => {
+                        const digits = (e.target.value || "").replace(/\D/g, "").slice(0, 18);
+                        return prev ? { ...prev, invoiceNumber: digits } : prev;
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm">Cliente</Label>
+                  <select
+                    className="h-10 w-full border rounded px-2"
+                    value={String(editRow.customerCode ?? "")}
+                    onChange={(e) => {
+                      const code = Number(e.target.value);
+                      const cust = customersState.find((c) => Number(c.code) === code);
+                      setEditRow((prev) =>
+                        prev ? { ...prev, customerCode: code, clientName: cust?.legal_name ?? prev.clientName } : prev
+                      );
+                    }}
+                  >
+                    <option value="">Selecione...</option>
+                    {customersState.map((c) => (
+                      <option key={c.code} value={Number(c.code)}>
+                        {c.legal_name ?? "Cliente"} ({c.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-100 border">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Produto</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Quantidade</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">SIF/SISBI</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Temperatura (°C)</th>
+                      <th className="px-3 py-2 text-left text-sm font-medium text-gray-900">Data Prod/Lote</th>
+                      <th className="px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {editRow.products.map((p, i) => (
+                      <tr key={`edit-prod-${i}`}>
+                        <td className="px-3 py-2">
+                          <select
+                            className="h-10 w-full border rounded px-2"
+                            value={String(p.productCode)}
+                            onChange={(e) => {
+                              const code = e.target.value;
+                              const prod = productsState.find((pr) => String(pr.code) === String(code));
+                              setEditRow((prev) => {
+                                if (!prev) return prev;
+                                const next = [...prev.products];
+                                next[i] = { ...next[i], productCode: String(code), productName: prod?.description ?? next[i].productName };
+                                return { ...prev, products: next };
+                              });
+                            }}
+                          >
+                            {productsState.map((pr) => (
+                              <option key={String(pr.code)} value={String(pr.code)}>
+                                {pr.description ?? pr.code}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            value={String(p.quantity)}
+                            onChange={(e) => {
+                              const val = Number(e.target.value) || 0;
+                              setEditRow((prev) => {
+                                if (!prev) return prev;
+                                const next = [...prev.products];
+                                next[i] = { ...next[i], quantity: val };
+                                return { ...prev, products: next };
+                              });
+                            }}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            className="h-10 w-full border rounded px-2"
+                            value={p.sifOrSisbi ?? "NA"}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditRow((prev) => {
+                                if (!prev) return prev;
+                                const next = [...prev.products];
+                                next[i] = { ...next[i], sifOrSisbi: val };
+                                return { ...prev, products: next };
+                              });
+                            }}
+                          >
+                            <option value="NA">N/A</option>
+                            <option value="SIF">SIF</option>
+                            <option value="SISBI">SISBI</option>
+                          </select>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            value={String(p.productTemperature ?? 0)}
+                            onChange={(e) => {
+                              const val = Number(e.target.value) || 0;
+                              setEditRow((prev) => {
+                                if (!prev) return prev;
+                                const next = [...prev.products];
+                                next[i] = { ...next[i], productTemperature: val };
+                                return { ...prev, products: next };
+                              });
+                            }}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input
+                            placeholder="dd/mm/aaaa"
+                            value={p.productionDate}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditRow((prev) => {
+                                if (!prev) return prev;
+                                const next = [...prev.products];
+                                next[i] = { ...next[i], productionDate: val };
+                                return { ...prev, products: next };
+                              });
+                            }}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditRow((prev) => {
+                                if (!prev) return prev;
+                                const next = prev.products.filter((_, idx) => idx !== i);
+                                return { ...prev, products: next };
+                              });
+                            }}
+                          >
+                            Remover
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditRow((prev) => {
+                        if (!prev) return prev;
+                        const firstProd = productsState[0];
+                        const next = [
+                          ...prev.products,
+                          {
+                            productCode: String(firstProd?.code ?? ""),
+                            productName: firstProd?.description ?? "Produto",
+                            quantity: 0,
+                            productionDate: formatDate(new Date()),
+                            productTemperature: 0,
+                            sifOrSisbi: "NA",
+                          },
+                        ];
+                        return { ...prev, products: next };
+                      });
+                    }}
+                  >
+                    Adicionar produto
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+                <Button className="bg-yellow-400 hover:bg-yellow-500 text-black" onClick={handleEditSave}>Salvar</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de confirmação de exclusão */}
+      <AlertDialog open={deleteOpen} onOpenChange={(open) => setDeleteOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteOpen(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async () => {
+                if (pendingDeleteId == null) return;
+                try {
+                  const baseURL = process.env.NEXT_PUBLIC_API_URL;
+                  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+                  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+                  await axios.delete(`${baseURL}/daily-report/${pendingDeleteId}`, { headers });
+                  setRows((prev) => prev.filter((r) => r.reportId !== pendingDeleteId));
+                  setDeleteOpen(false);
+                  setPendingDeleteId(null);
+                  toast({
+                    title: "Exclusão efetuada com sucesso",
+                    description: "O relatório foi excluído.",
+                  });
+                } catch (e: any) {
+                  const msg = e?.response?.data?.message || e?.message || "Falha ao excluir relatório.";
+                  setDeleteOpen(false);
+                  setPendingDeleteId(null);
+                  alert(msg);
+                }
+              }}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
