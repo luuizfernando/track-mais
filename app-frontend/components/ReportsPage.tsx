@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Edit, Trash2, Filter } from "lucide-react";
+import { Edit, Trash2, Filter, Download } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import OnboardingForm from "./multistep-form";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { ApiCustomer, ApiDailyReport, ApiMonthlyReport, ApiProduct, ApiUser, ReportRow } from "@/utils/types/main";
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 import {
   AlertDialog,
@@ -55,24 +57,20 @@ export function ReportsPage() {
       if (!isNaN(d.getTime())) return d.toLocaleDateString("pt-BR");
       return String(input);
     } else if (typeof input === "object") {
-      // Caso legado: objeto vazio vindo do backend
       return "N/A";
     }
 
     if (!iso) return "N/A";
 
-    // Prioriza o parse de AAAA-MM-DD (com ou sem parte de horário), evitando shift por timezone
     const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
     if (m) {
       const dLocal = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
       if (!isNaN(dLocal.getTime())) return dLocal.toLocaleDateString("pt-BR");
     }
 
-    // Fallback: tenta parse padrão
     const d1 = new Date(iso);
     if (!isNaN(d1.getTime())) return d1.toLocaleDateString("pt-BR");
 
-    // Último recurso: retorna string original
     return iso;
   };
 
@@ -85,12 +83,12 @@ export function ReportsPage() {
 
   const capitalize = (s: string) =>
     s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+    
   const getMonthKey = (input: Date | string | number | null | undefined) => {
     let d: Date | null = null;
     if (input instanceof Date) {
       d = input;
     } else if (typeof input === "string") {
-      // Prioriza AAAA-MM-DD (com ou sem horário) para evitar timezone
       const m = input.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
       if (m) {
         d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
@@ -136,7 +134,6 @@ export function ReportsPage() {
           ? { Authorization: `Bearer ${token}` }
           : undefined;
 
-        // Buscar relatórios, clientes e produtos em paralelo
         const [repRes, custRes, prodRes, usersRes, monthlyRes] =
           await Promise.all([
             axios.get<ApiDailyReport[]>(`${baseURL}/daily-report`, { headers }),
@@ -173,7 +170,6 @@ export function ReportsPage() {
           ? monthlyRes.data
           : [];
 
-        // Mapas auxiliares
         const customerByCode = new Map<number, ApiCustomer>();
         customers.forEach((c) => customerByCode.set(Number(c.code), c));
 
@@ -183,7 +179,6 @@ export function ReportsPage() {
         const userById = new Map<number, ApiUser>();
         users.forEach((u) => userById.set(Number(u.id), u));
 
-        // Para cada relatório, criar UMA linha agregada por cliente no dia (fillingDate)
         const builtRows: ReportRow[] = [];
         for (const r of reports) {
           const invoice = String(r.invoiceNumber);
@@ -264,14 +259,181 @@ export function ReportsPage() {
     );
   };
 
-  const handleExportPDF = () => {
-    console.log("Exporting PDF...");
-    // Implement PDF export logic
-  };
+  // =========================================================
+  // IMPLEMENTAÇÃO DO DOWNLOAD EXCEL (DIPOVA)
+  // =========================================================
+  const handleExportExcel = async () => {
+    if (!dipovaMonth) {
+      toast({ title: "Selecione um mês para exportar", variant: "destructive" });
+      return;
+    }
 
-  const handleExportExcel = () => {
-    console.log("Exporting Excel...");
-    // Implement Excel export logic
+    // 1. Preparar os dados (Mesma lógica da renderização da tabela)
+    type DipovaItem = {
+      productCode: number;
+      productName: string;
+      clientName: string;
+      quantity: number;
+      truckTemperature: number;
+      productionDate: string;
+      expeditionDate: string;
+      driver: string;
+      vehicle: string;
+    };
+    const dipovaMap = new Map<string, DipovaItem>();
+
+    for (const r of rows) {
+      if (getMonthKey(r.fillingDateIso) !== dipovaMonth) continue;
+
+      const destination = r.clientName || "N/A";
+      const truckTemp = r.productTemperature ?? 0;
+      const expDate = r.fillingDate; // DD/MM/YYYY
+      const driver = r.driver || "—";
+      const vehicle = r.deliverVehicle || "—";
+
+      for (const p of r.products) {
+        const pCode = Number(p.productCode);
+        const qty = Number(p.quantity) || 0;
+        if (qty <= 0) continue;
+
+        const prodDate = p.productionDate; // DD/MM/YYYY
+        // Chave única de agrupamento
+        const key = `${pCode}|${destination}|${prodDate}|${expDate}|${driver}|${vehicle}`;
+        const existing = dipovaMap.get(key);
+
+        if (existing) {
+          existing.quantity += qty;
+          existing.truckTemperature = truckTemp;
+        } else {
+          dipovaMap.set(key, {
+            productCode: pCode,
+            productName: p.productName,
+            clientName: destination,
+            quantity: qty,
+            truckTemperature: truckTemp,
+            productionDate: prodDate,
+            expeditionDate: expDate,
+            driver,
+            vehicle,
+          });
+        }
+      }
+    }
+
+    const sortedItems = Array.from(dipovaMap.values()).sort(
+      (a, b) =>
+        a.productName.localeCompare(b.productName) ||
+        a.clientName.localeCompare(b.clientName)
+    );
+
+    if (sortedItems.length === 0) {
+      toast({ title: "Sem dados para exportar neste mês", variant: "default" });
+      return;
+    }
+
+    // 2. Criar o Workbook com ExcelJS
+    const workbook = new ExcelJS.Workbook();
+    // O nome da aba será algo como "Jan-25" (derivado do dipovaMonth que é Jan-2025 ou similar)
+    const sheetName = dipovaMonth.split("-").map((p, i) => i === 1 ? p.slice(2) : p).join("-");
+    const worksheet = workbook.addWorksheet(sheetName);
+
+    // 3. Configurar Cabeçalho Fixo (Estilo Relatório DIPOVA)
+    // Linha 1: Título
+    worksheet.mergeCells('A1:H1');
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = 'Relatório de Comercialização de produtos';
+    titleCell.font = { bold: true, size: 14 };
+    titleCell.alignment = { horizontal: 'center' };
+
+    // Linha 2: Estabelecimento
+    worksheet.mergeCells('A2:E2');
+    worksheet.getCell('A2').value = 'ESTABELECIMENTO: DA ROÇA COMÉRCIO E INDÚSTRIA DE ALIMENTOS LTDA-ME';
+    worksheet.getCell('A2').font = { bold: true, size: 9 };
+    
+    worksheet.mergeCells('F2:H2');
+    worksheet.getCell('F2').value = 'Nº REG. DIPOVA: 442';
+    worksheet.getCell('F2').font = { bold: true, size: 9 };
+
+    // Linha 3: Endereço
+    worksheet.mergeCells('A3:E3');
+    worksheet.getCell('A3').value = 'ENDEREÇO: ADE QUADRA 2 CONJUNTO A P SUL LOTE 11 - CEILÂNDIA - BRASÍLIA/DF';
+    worksheet.getCell('A3').font = { size: 9 };
+
+    worksheet.mergeCells('F3:H3');
+    worksheet.getCell('F3').value = 'TEL/FAX: (61) 3578-4223';
+    worksheet.getCell('F3').font = { size: 9 };
+
+    // Linha 4: Mês Referência
+    worksheet.mergeCells('A4:C4');
+    worksheet.getCell('A4').value = `MÊS/ANO DE REFERÊNCIA: ${dipovaMonth.toUpperCase()}`;
+    worksheet.getCell('A4').font = { bold: true, size: 9 };
+
+    worksheet.mergeCells('D4:H4');
+    worksheet.getCell('D4').value = 'RESP. PREENCHIMENTO: TAYNARA SOUZA'; // Você pode pegar isso dinamicamente se tiver
+    worksheet.getCell('D4').font = { size: 9 };
+
+    // Espaço em branco
+    worksheet.addRow([]);
+    worksheet.addRow([]);
+
+    // Linha 7: Cabeçalho da Tabela
+    const headerRow = worksheet.getRow(7);
+    headerRow.values = [
+      'Produto', 
+      'Data de produção/lote', 
+      'Data da expedição', 
+      'Quant.', 
+      'Destino', 
+      '', // Coluna vazia pra espaçamento se necessário, ou merge
+      'Temp.', 
+      'Entregador/caminhão'
+    ];
+    headerRow.font = { bold: true };
+    headerRow.eachCell((cell) => {
+      cell.border = { bottom: { style: 'thin' } };
+    });
+
+    // Ajuste da coluna F (que nos CSVs parece estar vazia ou mesclada com Destino, vamos seguir o padrão visual)
+    // No seu CSV exemplo: Produto, Data, Data, Quant, Destino, (vazio), Temp, Entregador.
+    // Vamos replicar isso.
+    
+    // 4. Inserir Dados
+    let totalQty = 0;
+    sortedItems.forEach((item) => {
+      totalQty += item.quantity;
+      const row = worksheet.addRow([
+        item.productName,
+        item.productionDate, // formatToDayMonth se quiser encurtar
+        item.expeditionDate, // formatToDayMonth se quiser encurtar
+        item.quantity,
+        item.clientName,
+        '', // Coluna vazia
+        `${item.truckTemperature} °C`,
+        `${item.driver} / ${item.vehicle}`
+      ]);
+      
+      // Formatação simples
+      row.getCell(4).numFmt = '#,##0.00'; // Formato numérico para quantidade
+    });
+
+    // 5. Total
+    const totalRow = worksheet.addRow(['', '', 'TOTAL:', totalQty, '', '', '', '']);
+    totalRow.font = { bold: true };
+    totalRow.getCell(4).numFmt = '#,##0.00';
+
+    // 6. Ajuste de largura das colunas (Opcional, mas fica melhor)
+    worksheet.getColumn(1).width = 35; // Produto
+    worksheet.getColumn(2).width = 15; // Data Prod
+    worksheet.getColumn(3).width = 15; // Data Exp
+    worksheet.getColumn(4).width = 12; // Quant
+    worksheet.getColumn(5).width = 25; // Destino
+    worksheet.getColumn(7).width = 10; // Temp
+    worksheet.getColumn(8).width = 25; // Entregador
+
+    // 7. Download
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `Relatorio_Comercializacao_${dipovaMonth}.xlsx`);
   };
 
   const toggleRow = (key: string) => {
@@ -292,7 +454,6 @@ export function ReportsPage() {
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const { toast } = useToast();
 
-  // Armazenar clientes/produtos carregados para o modal
   useEffect(() => {
     (async () => {
       try {
@@ -313,14 +474,13 @@ export function ReportsPage() {
         setCustomersState(custRes.data?.data ?? []);
         setProductsState(prodRes.data?.data ?? []);
       } catch (_) {
-        // silencioso; não bloquear a página
       }
     })();
   }, []);
 
   const parsePtBrToISO = (d: string) => {
     const m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (!m) return d; // retornar como veio se já está ISO
+    if (!m) return d;
     return `${m[3]}-${m[2]}-${m[1]}`;
   };
 
@@ -360,7 +520,6 @@ export function ReportsPage() {
         { headers }
       );
 
-      // Atualizar estado local
       setRows((prev) =>
         prev.map((r) => (r.reportId === editRow.reportId ? { ...editRow } : r))
       );
@@ -377,12 +536,10 @@ export function ReportsPage() {
   };
 
   const handleDelete = async (reportId: number) => {
-    // Abre modal de confirmação
     setPendingDeleteId(reportId);
     setDeleteOpen(true);
   };
 
-  // Agrupamento por mês (Data de preenchimento)
   const groups = rows.reduce<Record<string, ReportRow[]>>((acc, row) => {
     const k = getMonthKey(row.fillingDateIso);
     if (!acc[k]) acc[k] = [];
@@ -391,7 +548,6 @@ export function ReportsPage() {
   }, {});
 
   const orderedMonthKeys = Object.keys(groups).sort((a, b) => {
-    // sort by YYYY-MM behind the scenes
     const parse = (key: string) => {
       const [mon, yr] = key.split("-");
       const months = [
@@ -416,7 +572,6 @@ export function ReportsPage() {
     return parse(b) - parse(a);
   });
 
-  // Estado de mês selecionado para DIPOVA, baseado na data de preenchimento
   const [dipovaMonth, setDipovaMonth] = useState<string | null>(null);
   useEffect(() => {
     if (!dipovaMonth && orderedMonthKeys.length > 0) {
@@ -431,61 +586,17 @@ export function ReportsPage() {
       0
     );
 
-  const monthAbbr = [
-    "jan",
-    "fev",
-    "mar",
-    "abr",
-    "mai",
-    "jun",
-    "jul",
-    "ago",
-    "set",
-    "out",
-    "nov",
-    "dez",
-  ];
-  const formatMonthBr = (iso: string) => {
-    const m = iso.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})(?:[T\s].*)?$/);
-    let d: Date | null = null;
-    if (m) d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    else {
-      const tryD = new Date(iso);
-      if (!isNaN(tryD.getTime())) d = tryD;
-      else return iso;
-    }
-    const mm = d.getMonth();
-    const yy = d.getFullYear() % 100;
-    return `${monthAbbr[mm]}-${yy}`;
-  };
-
-  // Formata a label exibida nas tabs de mês (Mon-YY)
   const formatChipLabel = (key: string) => {
     const [mon, yr] = key.split("-");
     const yr2 = String(yr).slice(-2);
     return `${mon}-${yr2}`;
   };
-  const isSameMonthYear = (iso: string, ref: Date) => {
-    const m = iso.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})(?:[T\s].*)?$/);
-    let d: Date | null = null;
-    if (m) d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    else {
-      const tryD = new Date(iso);
-      if (!isNaN(tryD.getTime())) d = tryD;
-      else return false;
-    }
-    return (
-      d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear()
-    );
-  };
 
   return (
     <div className="space-y-6">
-      {/* Header with New Record Button */}
       <div className="flex justify-between items-center">
         <div className="text-xl font-semibold text-gray-900">Relatórios</div>
 
-        {/* ===== 2. IMPLEMENTAÇÃO DO DIALOG ===== */}
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button className="bg-yellow-400 hover:bg-yellow-500 text-black font-medium px-6">
@@ -493,18 +604,11 @@ export function ReportsPage() {
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg p-0">
-            {/* p-0 é adicionado para remover o padding padrão do Dialog,
-              pois o OnboardingForm já tem seu próprio padding (py-8).
-              max-w-lg é para corresponder ao estilo do formulário.
-              O DialogContent já tem scroll automático.
-            */}
             <OnboardingForm onSuccess={() => setCreateOpen(false)} />
           </DialogContent>
         </Dialog>
-        {/* ===== FIM DA IMPLEMENTAÇÃO ===== */}
       </div>
 
-      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger
@@ -521,7 +625,6 @@ export function ReportsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Filters */}
         <div className="mt-6 flex items-center gap-2 text-sm text-gray-600">
           <Filter className="h-4 w-4 text-gray-500" />
           <span>Filtros</span>
@@ -607,10 +710,8 @@ export function ReportsPage() {
                         const groupRows = groups[mk] || [];
                         const isExpanded = expandedMonths.includes(mk);
                         const totalExp = groupRows.length;
-                        const totalKg = sumQty(groupRows);
                         return (
                           <>
-                            {/* Linha de resumo do mês */}
                             <tr
                               key={`sum-${mk}`}
                               className="bg-gray-100 border-b"
@@ -645,7 +746,6 @@ export function ReportsPage() {
                               </td>
                             </tr>
 
-                            {/* Headers por mês, dentro da área expansível */}
                             {isExpanded && (
                               <tr className="bg-gray-50 border-b">
                                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">
@@ -663,12 +763,10 @@ export function ReportsPage() {
                               </tr>
                             )}
 
-                            {/* Linhas detalhadas do mês */}
                             {isExpanded &&
                               groupRows.map((row, idx) => {
                                 const rkey = `${row.reportId}-${idx}`;
                                 const rExpanded = expandedRowKeys.has(rkey);
-                                const userName = row.userName ?? "—";
                                 return (
                                   <>
                                     <tr key={rkey} className="hover:bg-gray-50">
@@ -837,8 +935,7 @@ export function ReportsPage() {
         <TabsContent value="dipova" className="mt-6">
           <Card>
             <CardContent className="p-0">
-              {/* Seleção de mês da DIPOVA */}
-              <div className="px-4 py-3 border-b">
+              <div className="px-4 py-3 border-b flex justify-between items-center flex-wrap gap-4">
                 <Tabs
                   value={dipovaMonth ?? ""}
                   onValueChange={(v) => setDipovaMonth(v)}
@@ -855,7 +952,18 @@ export function ReportsPage() {
                     ))}
                   </TabsList>
                 </Tabs>
+
+                {/* BOTÃO DE DOWNLOAD AQUI */}
+                <Button 
+                    variant="outline" 
+                    className="flex items-center gap-2 border-green-600 text-green-700 hover:bg-green-50"
+                    onClick={handleExportExcel}
+                >
+                    <Download className="h-4 w-4" />
+                    Baixar Excel (DIPOVA)
+                </Button>
               </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-100 border-b">
@@ -1006,13 +1114,11 @@ export function ReportsPage() {
                         );
                       });
 
-                      // Soma total das quantidades exibidas
                       const totalQty = sortedItems.reduce(
                         (acc, item) => acc + item.quantity,
                         0
                       );
 
-                      // Linha de rodapé com valor apenas em Quant.
                       const footerRow = (
                         <tr key="dipova-total" className="bg-gray-50">
                           <td className="px-3 py-2"></td>
@@ -1040,7 +1146,7 @@ export function ReportsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Modal de edição */}
+      {/* Modais de Edição e Exclusão mantidos (código omitido para brevidade, mas deve ser mantido no arquivo original) */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-2xl">
           {editRow && (
@@ -1280,7 +1386,6 @@ export function ReportsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de confirmação de exclusão */}
       <AlertDialog
         open={deleteOpen}
         onOpenChange={(open) => setDeleteOpen(open)}
