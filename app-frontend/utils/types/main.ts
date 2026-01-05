@@ -30,6 +30,7 @@ export type ApiCustomer = {
 export type ApiProduct = {
   code: number | string;
   description: string | null;
+  weight?: number | null;
 };
 
 export type ApiUser = {
@@ -71,5 +72,6 @@ export type ReportRow = {
     productionDate: string;
     productTemperature?: number;
     sifOrSisbi?: string;
+    productWeight?: number;
   }>;
 };

@@ -213,6 +213,7 @@ export function ReportsPage() {
               productionDate: formatDate(prodDateIso),
               productTemperature: Number(it?.productTemperature ?? 0),
               sifOrSisbi: String(it?.sifOrSisbi ?? "") || undefined,
+              productWeight: prod?.weight ?? 1,
             });
           }
 
@@ -300,7 +301,7 @@ export function ReportsPage() {
 
       for (const p of r.products) {
         const pCode = Number(p.productCode);
-        const qty = Number(p.quantity) || 0;
+        const qty = (Number(p.quantity) || 0) * (p.productWeight ?? 1);
         if (qty <= 0) continue;
 
         const prodDate = p.productionDate; // DD/MM/YYYY
@@ -1066,7 +1067,8 @@ export function ReportsPage() {
 
                         for (const p of r.products) {
                           const pCode = Number(p.productCode);
-                          const qty = Number(p.quantity) || 0;
+                          const qty =
+                            (Number(p.quantity) || 0) * (p.productWeight ?? 1);
                           if (qty <= 0) continue;
 
                           const prodDate = p.productionDate; // DD/MM/YYYY
