@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { PrismaModule } from "src/prisma/prisma.module";
@@ -13,6 +14,9 @@ import { MonthlyReportModule } from "src/monthly_report/monthly_report.module";
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     PrismaModule,
     UsersModule,
     ProductsModule,
@@ -26,4 +30,5 @@ import { MonthlyReportModule } from "src/monthly_report/monthly_report.module";
   controllers: [AppController],
   providers: [AppService],
 })
+
 export class AppModule {}
