@@ -8,9 +8,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Edit, Trash2, Filter } from "lucide-react";
 import { Label } from "@/components/ui/label";
-
-// 1. IMPORTS ADICIONADOS
+import { useToast } from "@/hooks/use-toast";
+import OnboardingForm from "./multistep-form";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+
 import {
   AlertDialog,
   AlertDialogContent,
@@ -20,9 +21,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
-// Assuma que OnboardingForm.tsx está na mesma pasta
-import OnboardingForm from "./multistep-form";
 
 export function ReportsPage() {
   const [activeTab, setActiveTab] = useState("controle");
@@ -53,6 +51,7 @@ export function ReportsPage() {
     fillingDate?: string; // ISO (momento do preenchimento)
     userId: number;
     deliverVehicle?: string | null;
+    driver?: string;
     hasGoodSanitaryCondition: boolean;
     productTemperature: number;
   };
@@ -96,6 +95,7 @@ export function ReportsPage() {
     userId: number;
     userName?: string;
     deliverVehicle?: string | null;
+    driver?: string;
     hasGoodSanitaryCondition: boolean;
     productTemperature: number;
     fillingDate: string;
@@ -286,9 +286,7 @@ export function ReportsPage() {
               productName: prodName,
               quantity: qty,
               productionDate: formatDate(prodDateIso),
-              productTemperature: Number(
-                it?.productTemperature ?? r.productTemperature ?? 0
-              ),
+              productTemperature: Number(it?.productTemperature ?? 0),
               sifOrSisbi: String(it?.sifOrSisbi ?? "") || undefined,
             });
           }
@@ -302,6 +300,7 @@ export function ReportsPage() {
             userId: Number(r.userId),
             userName: userById.get(Number(r.userId))?.name ?? "—",
             deliverVehicle: r.deliverVehicle ?? null,
+            driver: r.driver,
             hasGoodSanitaryCondition: !!r.hasGoodSanitaryCondition,
             productTemperature: Number(r.productTemperature ?? 0),
             fillingDate: formatDate(fillingIso),
@@ -993,6 +992,8 @@ export function ReportsPage() {
                         truckTemperature: number;
                         productionDate: string;
                         expeditionDate: string;
+                        driver: string;
+                        vehicle: string;
                       };
                       const dipovaMap = new Map<string, DipovaItem>();
 
@@ -1008,6 +1009,8 @@ export function ReportsPage() {
                         const destination = r.clientName || "N/A";
                         const truckTemp = r.productTemperature ?? 0;
                         const expDate = r.fillingDate; // DD/MM/YYYY
+                        const driver = r.driver || "—";
+                        const vehicle = r.deliverVehicle || "—";
 
                         for (const p of r.products) {
                           const pCode = Number(p.productCode);
@@ -1015,7 +1018,7 @@ export function ReportsPage() {
                           if (qty <= 0) continue;
 
                           const prodDate = p.productionDate; // DD/MM/YYYY
-                          const key = `${pCode}|${destination}|${prodDate}|${expDate}`;
+                          const key = `${pCode}|${destination}|${prodDate}|${expDate}|${driver}|${vehicle}`;
                           const existing = dipovaMap.get(key);
 
                           if (existing) {
@@ -1030,6 +1033,8 @@ export function ReportsPage() {
                               truckTemperature: truckTemp,
                               productionDate: prodDate,
                               expeditionDate: expDate,
+                              driver,
+                              vehicle,
                             });
                           }
                         }
@@ -1040,13 +1045,6 @@ export function ReportsPage() {
                           a.productName.localeCompare(b.productName) ||
                           a.clientName.localeCompare(b.clientName)
                       );
-
-                      // Valores fixos
-                      const abbrCurrent = formatMonthBr(
-                        new Date().toISOString()
-                      );
-                      // const defaultTemp = '0 °C'; // REMOVIDO: Usar temperatura real
-                      const defaultDeliverer = "Próprio";
 
                       if (sortedItems.length === 0) {
                         return (
@@ -1078,7 +1076,9 @@ export function ReportsPage() {
                             <td className="px-3 py-2">
                               {item.truckTemperature} °C
                             </td>
-                            <td className="px-3 py-2">{defaultDeliverer}</td>
+                            <td className="px-3 py-2">
+                              {item.driver} / {item.vehicle}
+                            </td>
                           </tr>
                         );
                       });
