@@ -11,7 +11,6 @@ import {
   ChevronsUpDown,
   Store,
   Truck,
-  PiggyBank,
   ClipboardPen,
   Trash2,
   FileText
@@ -20,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -381,17 +379,50 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
         setProductsError(null);
         const token =
           typeof window !== "undefined" ? localStorage.getItem("token") : null;
-        const res = await axios.get<Paginated<ApiProduct> | ApiProduct[]>(
-          `${process.env.NEXT_PUBLIC_API_URL}/products`,
-          token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
-        );
-        const payload = res.data as any;
-        const list: ApiProduct[] = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.data)
-            ? payload.data
-            : [];
-        setProducts(list);
+        
+        const limit = 50; 
+        let offset = 0;
+        let allProducts: ApiProduct[] = [];
+        let hasMore = true;
+        
+        // Loop para buscar todas as páginas
+        while (hasMore) {
+          const res = await axios.get<Paginated<ApiProduct> | ApiProduct[]>(
+            `${process.env.NEXT_PUBLIC_API_URL}/products`,
+            {
+              headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+              params: { limit, offset },
+            }
+          );
+          
+          const payload = res.data as any;
+          const list: ApiProduct[] = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+          
+          if (list.length > 0) {
+             // Evitar duplicatas caso a paginação falhe e retorne os mesmos itens
+             const newItems = list.filter(newItem => 
+               !allProducts.some(existing => existing.code === newItem.code)
+             );
+             
+             if (newItems.length === 0) {
+               // Se todos os itens retornados já existem, paramos para evitar loop infinito
+               hasMore = false;
+             } else {
+               allProducts = [...allProducts, ...newItems];
+               offset += limit;
+             }
+
+             // Se veio menos que o limite, é a última página
+             // Se veio um array direto (não paginado), também paramos
+             if (list.length < limit || Array.isArray(payload)) {
+               hasMore = false;
+             }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        setProducts(allProducts);
       } catch (e: any) {
         console.error(e);
         setProductsError(
@@ -405,6 +436,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
     };
     fetchProducts();
   }, []);
+  
   const updateFormData = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -734,7 +766,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
         </div>
         <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden mt-3">
           <motion.div
-            className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 shadow-sm"
+            className="h-full bg-linear-to-r from-yellow-400 to-yellow-500 shadow-sm"
             initial={{ width: 0 }}
             animate={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
             transition={{ duration: 0.4, ease: "easeInOut" }}
@@ -761,7 +793,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                 {/* Step 2: Transport Information */}
                 {currentStep === 0 && (
                   <>
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
+                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
                       <CardTitle className="text-2xl font-bold text-gray-900">Informações do Transporte</CardTitle>
                       <p className="text-sm text-gray-500 mt-1">Preencha os dados do transporte e veículo</p>
                     </CardHeader>
@@ -859,7 +891,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                 {/* Step 1: Nota Fiscal */}
                 {currentStep === 1 && (
                   <>
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
+                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
                       <CardTitle className="text-2xl font-bold text-gray-900">Nota Fiscal</CardTitle>
                       <p className="text-sm text-gray-500 mt-1">Informe o número da Nota Fiscal</p>
                     </CardHeader>
@@ -885,7 +917,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                 {/* Step 2: Cliente + Produtos (Accordion + Modal) */}
                 {currentStep === 2 && (
                   <>
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
+                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
                       <CardTitle className="text-2xl font-bold text-gray-900">Clientes e Produtos</CardTitle>
                       <p className="text-sm text-gray-500 mt-1">Selecione um ou mais clientes e associe seus produtos</p>
                     </CardHeader>
@@ -1107,7 +1139,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                 {/* Step 5: Revisão */}
                 {currentStep === 3 && (
                   <>
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
+                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
                       <CardTitle className="text-2xl font-bold text-gray-900">Revisão</CardTitle>
                       <p className="text-sm text-gray-500 mt-1">Confira todos os dados antes de confirmar</p>
                     </CardHeader>
@@ -1254,8 +1286,8 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                   className={cn(
                     "flex items-center gap-2 transition-all duration-300 rounded-xl px-6 py-2 h-11 font-medium shadow-md hover:shadow-lg",
                     currentStep === steps.length - 1
-                      ? "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
-                      : "bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black"
+                      ? "bg-linear-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                      : "bg-linear-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black"
                   )}
                 >
                   {isSubmitting ? (
