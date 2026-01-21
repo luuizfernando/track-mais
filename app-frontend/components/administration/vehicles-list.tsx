@@ -19,6 +19,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface ApiVehicle {
   id: number;
@@ -48,6 +50,7 @@ export function VehiclesList({ onAdd }: VehiclesListProps) {
   const [hasNext, setHasNext] = useState(false);
   const limit = 13;
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [editOpen, setEditOpen] = useState(false);
   const [selected, setSelected] = useState<ApiVehicle | null>(null);
@@ -133,60 +136,110 @@ export function VehiclesList({ onAdd }: VehiclesListProps) {
       onAdd={onAdd}
       actionPlacement="footer"
     >
-      <Table>
-        <TableHeader>
-          <TableRow className="text-gray-500">
-            <TableHead className="w-[90px]">Cod.</TableHead>
-            <TableHead>Modelo</TableHead>
-            <TableHead>Placa</TableHead>
-            <TableHead>Telefone</TableHead>
-            <TableHead>Carga Max.</TableHead>
-            <TableHead>Observacoes</TableHead>
-            <TableHead className="text-end">Acoes</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      {isMobile ? (
+        <div className="space-y-4">
           {vehicles.map((vehicle) => (
-            <TableRow key={vehicle.id} className="text-gray-700">
-              <TableCell className="font-medium text-gray-900">
-                {vehicle.id}
-              </TableCell>
-              <TableCell className="font-medium ">{vehicle.model}</TableCell>
-              <TableCell>{vehicle.plate}</TableCell>
-              <TableCell>{vehicle.phone}</TableCell>
-              <TableCell>{vehicle.maximumLoad ?? "-"}</TableCell>
-              <TableCell>{vehicle.description ?? "-"}</TableCell>
-              <TableCell>
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
-                    onClick={() => { setSelected(vehicle); setEditForm({ ...vehicle }); setEditOpen(true); }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
-                    onClick={() => { setSelected(vehicle); setConfirmDelete(true); }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+            <Card key={vehicle.id} className="p-4">
+              <CardContent className="p-0">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium text-gray-900">{vehicle.model}</p>
+                      <p className="text-sm text-gray-600">Placa: {vehicle.plate}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => { setSelected(vehicle); setEditForm({ ...vehicle }); setEditOpen(true); }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-600"
+                        onClick={() => { setSelected(vehicle); setConfirmDelete(true); }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p><strong>Código:</strong> {vehicle.id}</p>
+                    <p><strong>Telefone:</strong> {vehicle.phone}</p>
+                    <p><strong>Carga Máx.:</strong> {vehicle.maximumLoad ?? "-"}</p>
+                    <p><strong>Observações:</strong> {vehicle.description ?? "-"}</p>
+                  </div>
                 </div>
-              </TableCell>
-            </TableRow>
+              </CardContent>
+            </Card>
           ))}
-        </TableBody>
-      </Table>
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow className="text-gray-500">
+              <TableHead className="w-[90px]">Cod.</TableHead>
+              <TableHead>Modelo</TableHead>
+              <TableHead>Placa</TableHead>
+              <TableHead>Telefone</TableHead>
+              <TableHead>Carga Max.</TableHead>
+              <TableHead>Observacoes</TableHead>
+              <TableHead className="text-end">Acoes</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {vehicles.map((vehicle) => (
+              <TableRow key={vehicle.id} className="text-gray-700">
+                <TableCell className="font-medium text-gray-900">
+                  {vehicle.id}
+                </TableCell>
+                <TableCell className="font-medium ">{vehicle.model}</TableCell>
+                <TableCell>{vehicle.plate}</TableCell>
+                <TableCell>{vehicle.phone}</TableCell>
+                <TableCell>{vehicle.maximumLoad ?? "-"}</TableCell>
+                <TableCell>{vehicle.description ?? "-"}</TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
+                      onClick={() => { setSelected(vehicle); setEditForm({ ...vehicle }); setEditOpen(true); }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
+                      onClick={() => { setSelected(vehicle); setConfirmDelete(true); }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
       <div className="flex items-center justify-between p-4">
         <Button
