@@ -13,7 +13,7 @@ import {
   Truck,
   ClipboardPen,
   Trash2,
-  FileText
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,10 +48,37 @@ import {
   CommandEmpty,
 } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 const steps = [
   { id: "transport", title: "Transporte" },
@@ -139,6 +166,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [formData, setFormData] = useState<FormData>({
     client: "",
     clientCode: "",
@@ -185,9 +213,17 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
 
   // Estado do modal de produto (adicionar/editar)
   const [productModalOpen, setProductModalOpen] = useState(false);
-  const [productModalGroupIndex, setProductModalGroupIndex] = useState<number | null>(null);
+  const [productModalGroupIndex, setProductModalGroupIndex] = useState<
+    number | null
+  >(null);
   const [productEditIndex, setProductEditIndex] = useState<number | null>(null);
-  const [productForm, setProductForm] = useState<{ code: string; quantity: string; sifOrSisbi: "" | "SIF" | "SISBI" | "NA"; productTemperature: string; productionDate: string }>({
+  const [productForm, setProductForm] = useState<{
+    code: string;
+    quantity: string;
+    sifOrSisbi: "" | "SIF" | "SISBI" | "NA";
+    productTemperature: string;
+    productionDate: string;
+  }>({
     code: "",
     quantity: "",
     sifOrSisbi: "",
@@ -195,8 +231,20 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
     productionDate: "",
   });
 
+  // Estado para seleção de cliente (mobile)
+  const [clientSheetOpen, setClientSheetOpen] = useState(false);
+  const [clientSheetGroupIndex, setClientSheetGroupIndex] = useState<
+    number | null
+  >(null);
+
   const resetProductForm = () => {
-    setProductForm({ code: "", quantity: "", sifOrSisbi: "", productTemperature: "", productionDate: "" });
+    setProductForm({
+      code: "",
+      quantity: "",
+      sifOrSisbi: "",
+      productTemperature: "",
+      productionDate: "",
+    });
     setProductEditIndex(null);
   };
 
@@ -234,7 +282,12 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
     const gIdx = productModalGroupIndex;
     const data = productForm;
     // validações simples
-    if (!data.code || !data.quantity || !data.productTemperature || !data.productionDate) {
+    if (
+      !data.code ||
+      !data.quantity ||
+      !data.productTemperature ||
+      !data.productionDate
+    ) {
       toast({ title: "Preencha todos os campos do produto." });
       return;
     }
@@ -275,7 +328,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
         {
           headers,
           params: { limit, offset: 0 },
-        }
+        },
       );
 
       const firstPayload = firstRes.data as any;
@@ -297,7 +350,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
           {
             headers,
             params: { limit, offset },
-          }
+          },
         );
         const pagePayload = pageRes.data as any;
         const pageList: ApiClient[] = Array.isArray(pagePayload)
@@ -315,7 +368,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
       setClientsError(
         e?.response?.status === 401
           ? "Não autorizado: verifique seu login."
-          : "Erro ao carregar clientes"
+          : "Erro ao carregar clientes",
       );
     } finally {
       setClientsLoading(false);
@@ -348,7 +401,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
           typeof window !== "undefined" ? localStorage.getItem("token") : null;
         const res = await axios.get<Paginated<ApiVehicle> | ApiVehicle[]>(
           `${process.env.NEXT_PUBLIC_API_URL}/vehicles`,
-          token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+          token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
         );
         const payload = res.data as any;
         const list: ApiVehicle[] = Array.isArray(payload)
@@ -362,7 +415,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
         setVehiclesError(
           e?.response?.status === 401
             ? "Não autorizado: verifique seu login/token."
-            : "Erro ao carregar veículos."
+            : "Erro ao carregar veículos.",
         );
       } finally {
         setVehiclesLoading(false);
@@ -379,12 +432,12 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
         setProductsError(null);
         const token =
           typeof window !== "undefined" ? localStorage.getItem("token") : null;
-        
-        const limit = 50; 
+
+        const limit = 50;
         let offset = 0;
         let allProducts: ApiProduct[] = [];
         let hasMore = true;
-        
+
         // Loop para buscar todas as páginas
         while (hasMore) {
           const res = await axios.get<Paginated<ApiProduct> | ApiProduct[]>(
@@ -392,31 +445,36 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
             {
               headers: token ? { Authorization: `Bearer ${token}` } : undefined,
               params: { limit, offset },
-            }
+            },
           );
-          
-          const payload = res.data as any;
-          const list: ApiProduct[] = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
-          
-          if (list.length > 0) {
-             // Evitar duplicatas caso a paginação falhe e retorne os mesmos itens
-             const newItems = list.filter(newItem => 
-               !allProducts.some(existing => existing.code === newItem.code)
-             );
-             
-             if (newItems.length === 0) {
-               // Se todos os itens retornados já existem, paramos para evitar loop infinito
-               hasMore = false;
-             } else {
-               allProducts = [...allProducts, ...newItems];
-               offset += limit;
-             }
 
-             // Se veio menos que o limite, é a última página
-             // Se veio um array direto (não paginado), também paramos
-             if (list.length < limit || Array.isArray(payload)) {
-               hasMore = false;
-             }
+          const payload = res.data as any;
+          const list: ApiProduct[] = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : [];
+
+          if (list.length > 0) {
+            // Evitar duplicatas caso a paginação falhe e retorne os mesmos itens
+            const newItems = list.filter(
+              (newItem) =>
+                !allProducts.some((existing) => existing.code === newItem.code),
+            );
+
+            if (newItems.length === 0) {
+              // Se todos os itens retornados já existem, paramos para evitar loop infinito
+              hasMore = false;
+            } else {
+              allProducts = [...allProducts, ...newItems];
+              offset += limit;
+            }
+
+            // Se veio menos que o limite, é a última página
+            // Se veio um array direto (não paginado), também paramos
+            if (list.length < limit || Array.isArray(payload)) {
+              hasMore = false;
+            }
           } else {
             hasMore = false;
           }
@@ -428,7 +486,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
         setProductsError(
           e?.response?.status === 401
             ? "Não autorizado: verifique seu login."
-            : "Erro ao carregar produtos."
+            : "Erro ao carregar produtos.",
         );
       } finally {
         setProductsLoading(false);
@@ -436,12 +494,17 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
     };
     fetchProducts();
   }, []);
-  
+
   const updateFormData = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const updateCustomerGroup = (index: number, updater: (g: FormData["customerGroups"][number]) => FormData["customerGroups"][number]) => {
+  const updateCustomerGroup = (
+    index: number,
+    updater: (
+      g: FormData["customerGroups"][number],
+    ) => FormData["customerGroups"][number],
+  ) => {
     setFormData((prev) => {
       const groups = [...prev.customerGroups];
       groups[index] = updater(groups[index]);
@@ -468,9 +531,11 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
       const groups = [...prev.customerGroups];
       groups.splice(index, 1);
       return {
-        ...prev, customerGroups: groups.length > 0 ? groups : [
-          { clientCode: "", clientName: "", items: [] },
-        ]
+        ...prev,
+        customerGroups:
+          groups.length > 0
+            ? groups
+            : [{ clientCode: "", clientName: "", items: [] }],
       };
     });
   };
@@ -515,37 +580,50 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
 
         const fillingISO = new Date().toISOString();
 
-        const vehicleTemp = Number((formData.vehicleTemperature || "").replace(",", "."));
+        const vehicleTemp = Number(
+          (formData.vehicleTemperature || "").replace(",", "."),
+        );
 
-        const selectedPlate = vehicles.find((v) => String(v.id) === formData.vehicleId)?.plate;
+        const selectedPlate = vehicles.find(
+          (v) => String(v.id) === formData.vehicleId,
+        )?.plate;
 
         // Novo payload: customerGroups
-        const groupsValid = (formData.customerGroups ?? []).map((g) => {
-          const clientCodeNum = Number((g.clientCode || "").trim());
-          const items = (g.items ?? []).filter((it) =>
-            (it.code || "").trim() !== "" &&
-            (it.quantity || "").trim() !== "" &&
-            (it.productTemperature || "").trim() !== "" &&
-            (it.productionDate || "").trim() !== ""
-          ).map((it) => {
-            const codeNum = Number(it.code);
-            const qtyNum = Number(it.quantity);
-            const tempNum = Number((it.productTemperature || "").replace(",", "."));
-            const found = products.find((p) => p.code === codeNum);
-            return {
-              code: codeNum,
-              quantity: qtyNum,
-              description: found?.description ?? undefined,
-              sifOrSisbi: it.sifOrSisbi || undefined,
-              productTemperature: tempNum,
-              productionDate: `${it.productionDate}T00:00:00.000Z`,
-            };
-          });
-          return { customerCode: clientCodeNum, items };
-        }).filter((g) => !!g.customerCode && g.items.length > 0);
+        const groupsValid = (formData.customerGroups ?? [])
+          .map((g) => {
+            const clientCodeNum = Number((g.clientCode || "").trim());
+            const items = (g.items ?? [])
+              .filter(
+                (it) =>
+                  (it.code || "").trim() !== "" &&
+                  (it.quantity || "").trim() !== "" &&
+                  (it.productTemperature || "").trim() !== "" &&
+                  (it.productionDate || "").trim() !== "",
+              )
+              .map((it) => {
+                const codeNum = Number(it.code);
+                const qtyNum = Number(it.quantity);
+                const tempNum = Number(
+                  (it.productTemperature || "").replace(",", "."),
+                );
+                const found = products.find((p) => p.code === codeNum);
+                return {
+                  code: codeNum,
+                  quantity: qtyNum,
+                  description: found?.description ?? undefined,
+                  sifOrSisbi: it.sifOrSisbi || undefined,
+                  productTemperature: tempNum,
+                  productionDate: `${it.productionDate}T00:00:00.000Z`,
+                };
+              });
+            return { customerCode: clientCodeNum, items };
+          })
+          .filter((g) => !!g.customerCode && g.items.length > 0);
 
         if (groupsValid.length === 0) {
-          throw new Error("Adicione ao menos um cliente com produto(s) válido(s).");
+          throw new Error(
+            "Adicione ao menos um cliente com produto(s) válido(s).",
+          );
         }
 
         const payload: any = {
@@ -562,19 +640,25 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
         const res = await axios.post(
           `${process.env.NEXT_PUBLIC_API_URL}/daily-report`,
           payload,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
 
         toast({ title: "Relatório diário criado com sucesso!" });
         onSuccess?.();
       } catch (err: any) {
         console.error(err);
-        let message = err?.response?.data?.message || err?.message || "Falha ao enviar o relatório.";
+        let message =
+          err?.response?.data?.message ||
+          err?.message ||
+          "Falha ao enviar o relatório.";
         // Se o ValidationPipe retornar uma lista de mensagens, converter em string legível
         if (Array.isArray(message)) {
           message = message.join("; ");
         }
-        toast({ title: "Falha ao enviar o relatório.", description: String(message) });
+        toast({
+          title: "Falha ao enviar o relatório.",
+          description: String(message),
+        });
       } finally {
         setIsSubmitting(false);
       }
@@ -601,11 +685,12 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
           const hasClient = (g.clientCode || "").trim() !== "";
           const items = g.items ?? [];
           if (items.length === 0) return false;
-          return items.every((it) =>
-            (it.code || "").trim() !== "" &&
-            (it.quantity || "").trim() !== "" &&
-            (it.productTemperature || "").trim() !== "" &&
-            (it.productionDate || "").trim() !== ""
+          return items.every(
+            (it) =>
+              (it.code || "").trim() !== "" &&
+              (it.quantity || "").trim() !== "" &&
+              (it.productTemperature || "").trim() !== "" &&
+              (it.productionDate || "").trim() !== "",
           );
         });
         return eachValid;
@@ -619,6 +704,8 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
         return true;
     }
   };
+
+  // Função auxiliar removida - JSX inline
 
   return (
     <div className="w-full max-w-md sm:max-w-lg md:max-w-3xl lg:max-w-4xl mx-auto p-2 md:p-4 lg:p-6">
@@ -644,7 +731,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                       ? "bg-yellow-400 text-black shadow-md"
                       : index === currentStep
                         ? "bg-yellow-400 text-black ring-4 ring-yellow-400/30 shadow-lg"
-                        : "bg-gray-200 text-gray-400"
+                        : "bg-gray-200 text-gray-400",
                   )}
                   onClick={() => {
                     if (index <= currentStep) {
@@ -663,7 +750,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                       ? "bg-yellow-400 text-black shadow-md"
                       : index === currentStep
                         ? "bg-yellow-400 text-black ring-4 ring-yellow-400/30 shadow-lg"
-                        : "bg-gray-200 text-gray-400"
+                        : "bg-gray-200 text-gray-400",
                   )}
                   onClick={() => {
                     if (index <= currentStep) {
@@ -682,7 +769,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                       ? "bg-yellow-400 text-black shadow-md"
                       : index === currentStep
                         ? "bg-yellow-400 text-black ring-4 ring-yellow-400/30 shadow-lg"
-                        : "bg-gray-200 text-gray-400"
+                        : "bg-gray-200 text-gray-400",
                   )}
                   onClick={() => {
                     if (index <= currentStep) {
@@ -701,7 +788,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                       ? "bg-yellow-400 text-black shadow-md"
                       : index === currentStep
                         ? "bg-yellow-400 text-black ring-4 ring-yellow-400/30 shadow-lg"
-                        : "bg-gray-200 text-gray-400"
+                        : "bg-gray-200 text-gray-400",
                   )}
                   onClick={() => {
                     if (index <= currentStep) {
@@ -720,7 +807,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                       ? "bg-yellow-400 text-black shadow-md"
                       : index === currentStep
                         ? "bg-yellow-400 text-black ring-4 ring-yellow-400/30 shadow-lg"
-                        : "bg-gray-200 text-gray-400"
+                        : "bg-gray-200 text-gray-400",
                   )}
                   onClick={() => {
                     if (index <= currentStep) {
@@ -739,7 +826,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                       ? "bg-yellow-400 shadow-md"
                       : index === currentStep
                         ? "bg-yellow-400 ring-4 ring-yellow-400/30 shadow-lg"
-                        : "bg-gray-200"
+                        : "bg-gray-200",
                   )}
                   onClick={() => {
                     if (index <= currentStep) {
@@ -756,7 +843,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                     ? "text-gray-900"
                     : index < currentStep
                       ? "text-gray-700"
-                      : "text-gray-400"
+                      : "text-gray-400",
                 )}
               >
                 {step.title}
@@ -793,15 +880,17 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                 {/* Step 2: Transport Information */}
                 {currentStep === 0 && (
                   <>
-                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
-                      <CardTitle className="text-2xl font-bold text-gray-900">Informações do Transporte</CardTitle>
-                      <p className="text-sm text-gray-500 mt-1">Preencha os dados do transporte e veículo</p>
+                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 p-3 sm:p-6 pb-4">
+                      <CardTitle className="text-2xl font-bold text-gray-900">
+                        Informações do Transporte
+                      </CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Preencha os dados do transporte e veículo
+                      </p>
                     </CardHeader>
-                    <CardContent className="space-y-5 pt-6 pb-4">
+                    <CardContent className="space-y-5 p-3 sm:p-6 pt-6 pb-4">
                       <motion.div variants={fadeInUp} className="space-y-2">
-                        <Label htmlFor="driver">
-                          Motorista
-                        </Label>
+                        <Label htmlFor="driver">Motorista</Label>
                         <Input
                           id="driver"
                           value={formData.driver}
@@ -816,7 +905,9 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                         <Label htmlFor="vehicleId">Veículo</Label>
                         <Select
                           value={formData.vehicleId}
-                          onValueChange={(value) => updateFormData("vehicleId", value)}
+                          onValueChange={(value) =>
+                            updateFormData("vehicleId", value)
+                          }
                         >
                           <SelectTrigger
                             id="vehicleId"
@@ -835,16 +926,20 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                                 {vehiclesError}
                               </SelectItem>
                             )}
-                            {!vehiclesLoading && !vehiclesError && vehicles.length === 0 && (
-                              <SelectItem value="__empty" disabled>
-                                Nenhum veículo encontrado
-                              </SelectItem>
-                            )}
-                            {!vehiclesLoading && !vehiclesError && vehicles.map((v) => (
-                              <SelectItem key={v.id} value={String(v.id)}>
-                                {v.plate} — {v.model}
-                              </SelectItem>
-                            ))}
+                            {!vehiclesLoading &&
+                              !vehiclesError &&
+                              vehicles.length === 0 && (
+                                <SelectItem value="__empty" disabled>
+                                  Nenhum veículo encontrado
+                                </SelectItem>
+                              )}
+                            {!vehiclesLoading &&
+                              !vehiclesError &&
+                              vehicles.map((v) => (
+                                <SelectItem key={v.id} value={String(v.id)}>
+                                  {v.plate} — {v.model}
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       </motion.div>
@@ -853,22 +948,42 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                         <Label>Condições sanitárias do veículo</Label>
                         <RadioGroup
                           value={formData.sanitaryCondition}
-                          onValueChange={(value) => updateFormData("sanitaryCondition", value)}
+                          onValueChange={(value) =>
+                            updateFormData("sanitaryCondition", value)
+                          }
                           className="space-y-2"
                         >
                           <div className="flex items-center space-x-2 rounded-md border p-3 cursor-pointer hover:bg-accent transition-colors">
-                            <RadioGroupItem value="conforme" id="sanitary-conforme" />
-                            <Label htmlFor="sanitary-conforme" className="cursor-pointer w-full">Conforme</Label>
+                            <RadioGroupItem
+                              value="conforme"
+                              id="sanitary-conforme"
+                            />
+                            <Label
+                              htmlFor="sanitary-conforme"
+                              className="cursor-pointer w-full"
+                            >
+                              Conforme
+                            </Label>
                           </div>
                           <div className="flex items-center space-x-2 rounded-md border p-3 cursor-pointer hover:bg-accent transition-colors">
-                            <RadioGroupItem value="nao-conforme" id="sanitary-nao-conforme" />
-                            <Label htmlFor="sanitary-nao-conforme" className="cursor-pointer w-full">Não conforme</Label>
+                            <RadioGroupItem
+                              value="nao-conforme"
+                              id="sanitary-nao-conforme"
+                            />
+                            <Label
+                              htmlFor="sanitary-nao-conforme"
+                              className="cursor-pointer w-full"
+                            >
+                              Não conforme
+                            </Label>
                           </div>
                         </RadioGroup>
                       </motion.div>
 
                       <motion.div variants={fadeInUp} className="space-y-2">
-                        <Label htmlFor="vehicleTemperature">Temperatura do veículo (°C)</Label>
+                        <Label htmlFor="vehicleTemperature">
+                          Temperatura do veículo (°C)
+                        </Label>
                         <Input
                           id="vehicleTemperature"
                           type="number"
@@ -878,7 +993,9 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                           required
                           value={formData.vehicleTemperature}
                           onChange={(e) => {
-                            const v = e.target.value.replace(/[^0-9.,-]/g, "").replace(",", ".");
+                            const v = e.target.value
+                              .replace(/[^0-9.,-]/g, "")
+                              .replace(",", ".");
                             updateFormData("vehicleTemperature", v);
                           }}
                           className="transition-all duration-300 focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -891,11 +1008,15 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                 {/* Step 1: Nota Fiscal */}
                 {currentStep === 1 && (
                   <>
-                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
-                      <CardTitle className="text-2xl font-bold text-gray-900">Nota Fiscal</CardTitle>
-                      <p className="text-sm text-gray-500 mt-1">Informe o número da Nota Fiscal</p>
+                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 p-3 sm:p-6 pb-4">
+                      <CardTitle className="text-2xl font-bold text-gray-900">
+                        Nota Fiscal
+                      </CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Informe o número da Nota Fiscal
+                      </p>
                     </CardHeader>
-                    <CardContent className="space-y-5 pt-6 pb-4">
+                    <CardContent className="space-y-5 p-3 sm:p-6 pt-6 pb-4">
                       <motion.div variants={fadeInUp} className="space-y-2">
                         <Label htmlFor="invoiceNumber">N° Nota Fiscal</Label>
                         <Input
@@ -904,7 +1025,9 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                           placeholder="Somente números"
                           value={formData.invoiceNumber}
                           onChange={(e) => {
-                            const digits = (e.target.value || "").replace(/\D/g, "").slice(0, 18);
+                            const digits = (e.target.value || "")
+                              .replace(/\D/g, "")
+                              .slice(0, 18);
                             updateFormData("invoiceNumber", digits);
                           }}
                           className="transition-all duration-300 focus:ring-2 focus:ring-primary/20 focus:border-primary"
@@ -917,112 +1040,370 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                 {/* Step 2: Cliente + Produtos (Accordion + Modal) */}
                 {currentStep === 2 && (
                   <>
-                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
-                      <CardTitle className="text-2xl font-bold text-gray-900">Clientes e Produtos</CardTitle>
-                      <p className="text-sm text-gray-500 mt-1">Selecione um ou mais clientes e associe seus produtos</p>
+                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 p-3 sm:p-6 pb-4">
+                      <CardTitle className="text-2xl font-bold text-gray-900">
+                        Clientes e Produtos
+                      </CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Selecione um ou mais clientes e associe seus produtos
+                      </p>
                     </CardHeader>
-                    <CardContent className="space-y-5 pt-6 pb-4">
+                    <CardContent className="space-y-5 p-3 sm:p-6 pt-6 pb-4">
                       <motion.div variants={fadeInUp} className="space-y-6">
                         <Accordion type="multiple" className="w-full">
                           {formData.customerGroups.map((group, gIdx) => (
-                            <AccordionItem key={`group-${gIdx}`} value={`group-${gIdx}`}>
+                            <AccordionItem
+                              key={`group-${gIdx}`}
+                              value={`group-${gIdx}`}
+                            >
                               <AccordionTrigger>
                                 <div className="flex w-full items-center justify-between pr-2">
                                   <span className="font-medium">
-                                    {group.clientName ? `${group.clientName}${group.clientCode ? ` (${group.clientCode})` : ""}` : `Cliente #${gIdx + 1}`}
+                                    {group.clientName
+                                      ? `${group.clientName}${group.clientCode ? ` (${group.clientCode})` : ""}`
+                                      : `Cliente #${gIdx + 1}`}
                                   </span>
-                                  <Button type="button" variant="outline" size="icon" aria-label="Remover cliente" onClick={() => removeCustomerGroup(gIdx)}>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    aria-label="Remover cliente"
+                                    onClick={() => removeCustomerGroup(gIdx)}
+                                  >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </div>
                               </AccordionTrigger>
                               <AccordionContent>
                                 <div className="space-y-4">
-                                  <Popover onOpenChange={(open) => { if (open && !clientsFullyLoaded && !clientsLoading) { void fetchAllClients(); } }}>
-                                    <PopoverTrigger asChild>
-                                      <Button variant="outline" role="combobox" className="w-full justify-between">
-                                        {group.clientName ? group.clientName : "Selecionar cliente..."}
-                                        <ChevronsUpDown className="h-4 w-4 opacity-50" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="p-0">
-                                      <Command>
-                                        <CommandInput placeholder="Buscar cliente por nome ou código..." />
-                                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                                        <CommandList>
-                                          <CommandGroup>
-                                            {clientsLoading && (<div className="p-3 text-sm text-muted-foreground">Carregando...</div>)}
-                                            {clientsError && (<div className="p-3 text-sm text-red-600">{clientsError}</div>)}
-                                            {!clientsLoading && !clientsError && clients.map((c) => (
-                                              <CommandItem
-                                                key={c.code}
-                                                value={`${[c.fantasy_name, c.legal_name, String(c.code)].filter(Boolean).join(" ")}`}
-                                                onSelect={() => {
-                                                  updateCustomerGroup(gIdx, (g) => ({ ...g, clientCode: String(c.code), clientName: c.fantasy_name || c.legal_name }));
-                                                }}
-                                              >
-                                                <Check className={cn("mr-2 h-4 w-4", group.clientName === (c.fantasy_name || c.legal_name) ? "opacity-100" : "opacity-0")} />
-                                                <span className="truncate">{c.fantasy_name || c.legal_name}</span>
-                                                <span className="ml-2 text-xs text-muted-foreground">({c.code})</span>
-                                              </CommandItem>
-                                            ))}
-                                          </CommandGroup>
-                                        </CommandList>
-                                      </Command>
-                                    </PopoverContent>
-                                  </Popover>
+                                  {isMobile ? (
+                                    <Sheet
+                                      open={
+                                        clientSheetOpen &&
+                                        clientSheetGroupIndex === gIdx
+                                      }
+                                      onOpenChange={(open) => {
+                                        setClientSheetOpen(open);
+                                        if (
+                                          open &&
+                                          !clientsFullyLoaded &&
+                                          !clientsLoading
+                                        ) {
+                                          void fetchAllClients();
+                                        }
+                                        if (open)
+                                          setClientSheetGroupIndex(gIdx);
+                                      }}
+                                    >
+                                      <SheetTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          role="combobox"
+                                          className="w-full justify-between"
+                                        >
+                                          {group.clientName
+                                            ? group.clientName
+                                            : "Selecionar cliente..."}
+                                          <ChevronsUpDown className="h-4 w-4 opacity-50" />
+                                        </Button>
+                                      </SheetTrigger>
+                                      <SheetContent
+                                        side="bottom"
+                                        className="h-[80vh]"
+                                      >
+                                        <SheetHeader>
+                                          <SheetTitle>
+                                            Selecionar Cliente
+                                          </SheetTitle>
+                                        </SheetHeader>
+                                        <div className="mt-4">
+                                          <Command>
+                                            <CommandInput placeholder="Buscar cliente por nome ou código..." />
+                                            <CommandEmpty>
+                                              Nenhum cliente encontrado.
+                                            </CommandEmpty>
+                                            <CommandList className="max-h-[200px] sm:max-h-[300px] overflow-y-auto">
+                                              <CommandGroup>
+                                                {clientsLoading && (
+                                                  <div className="p-3 text-sm text-muted-foreground">
+                                                    Carregando...
+                                                  </div>
+                                                )}
+                                                {clientsError && (
+                                                  <div className="p-3 text-sm text-red-600">
+                                                    {clientsError}
+                                                  </div>
+                                                )}
+                                                {!clientsLoading &&
+                                                  !clientsError &&
+                                                  clients.map((c) => (
+                                                    <CommandItem
+                                                      key={c.code}
+                                                      value={`${[c.fantasy_name, c.legal_name, String(c.code)].filter(Boolean).join(" ")}`}
+                                                      onSelect={() => {
+                                                        updateCustomerGroup(
+                                                          gIdx,
+                                                          (g) => ({
+                                                            ...g,
+                                                            clientCode: String(
+                                                              c.code,
+                                                            ),
+                                                            clientName:
+                                                              c.fantasy_name ||
+                                                              c.legal_name,
+                                                          }),
+                                                        );
+                                                        if (isMobile)
+                                                          setClientSheetOpen(
+                                                            false,
+                                                          );
+                                                      }}
+                                                    >
+                                                      <Check
+                                                        className={cn(
+                                                          "mr-2 h-4 w-4",
+                                                          group.clientName ===
+                                                            (c.fantasy_name ||
+                                                              c.legal_name)
+                                                            ? "opacity-100"
+                                                            : "opacity-0",
+                                                        )}
+                                                      />
+                                                      <span className="truncate">
+                                                        {c.fantasy_name ||
+                                                          c.legal_name}
+                                                      </span>
+                                                      <span className="ml-2 text-xs text-muted-foreground">
+                                                        ({c.code})
+                                                      </span>
+                                                    </CommandItem>
+                                                  ))}
+                                              </CommandGroup>
+                                            </CommandList>
+                                          </Command>
+                                        </div>
+                                      </SheetContent>
+                                    </Sheet>
+                                  ) : (
+                                    <Popover
+                                      onOpenChange={(open) => {
+                                        if (
+                                          open &&
+                                          !clientsFullyLoaded &&
+                                          !clientsLoading
+                                        ) {
+                                          void fetchAllClients();
+                                        }
+                                      }}
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          role="combobox"
+                                          className="w-full justify-between"
+                                        >
+                                          {group.clientName
+                                            ? group.clientName
+                                            : "Selecionar cliente..."}
+                                          <ChevronsUpDown className="h-4 w-4 opacity-50" />
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent
+                                        className="p-0 w-[--radix-popover-trigger-width] max-w-[calc(100vw-2rem)]"
+                                        collisionPadding={10}
+                                        side="bottom"
+                                      >
+                                        <Command>
+                                          <CommandInput placeholder="Buscar cliente por nome ou código..." />
+                                          <CommandEmpty>
+                                            Nenhum cliente encontrado.
+                                          </CommandEmpty>
+                                          <CommandList className="max-h-[200px] sm:max-h-[300px] overflow-y-auto">
+                                            <CommandGroup>
+                                              {clientsLoading && (
+                                                <div className="p-3 text-sm text-muted-foreground">
+                                                  Carregando...
+                                                </div>
+                                              )}
+                                              {clientsError && (
+                                                <div className="p-3 text-sm text-red-600">
+                                                  {clientsError}
+                                                </div>
+                                              )}
+                                              {!clientsLoading &&
+                                                !clientsError &&
+                                                clients.map((c) => (
+                                                  <CommandItem
+                                                    key={c.code}
+                                                    value={`${[c.fantasy_name, c.legal_name, String(c.code)].filter(Boolean).join(" ")}`}
+                                                    onSelect={() => {
+                                                      updateCustomerGroup(
+                                                        gIdx,
+                                                        (g) => ({
+                                                          ...g,
+                                                          clientCode: String(
+                                                            c.code,
+                                                          ),
+                                                          clientName:
+                                                            c.fantasy_name ||
+                                                            c.legal_name,
+                                                        }),
+                                                      );
+                                                      if (isMobile)
+                                                        setClientSheetOpen(
+                                                          false,
+                                                        );
+                                                    }}
+                                                  >
+                                                    <Check
+                                                      className={cn(
+                                                        "mr-2 h-4 w-4",
+                                                        group.clientName ===
+                                                          (c.fantasy_name ||
+                                                            c.legal_name)
+                                                          ? "opacity-100"
+                                                          : "opacity-0",
+                                                      )}
+                                                    />
+                                                    <span className="truncate">
+                                                      {c.fantasy_name ||
+                                                        c.legal_name}
+                                                    </span>
+                                                    <span className="ml-2 text-xs text-muted-foreground">
+                                                      ({c.code})
+                                                    </span>
+                                                  </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                          </CommandList>
+                                        </Command>
+                                      </PopoverContent>
+                                    </Popover>
+                                  )}
 
                                   {/* Tabela resumo de produtos */}
                                   <div className="space-y-2">
                                     <Label>Produtos do cliente</Label>
                                     {group.items && group.items.length > 0 ? (
-                                      <Table>
-                                        <TableHeader>
-                                          <TableRow>
-                                            <TableHead>Produto</TableHead>
-                                            <TableHead>Quantidade</TableHead>
-                                            <TableHead>SIF/SISBI</TableHead>
-                                            <TableHead>Temp (°C)</TableHead>
-                                            <TableHead>Produção</TableHead>
-                                            <TableHead>Ações</TableHead>
-                                          </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                          {group.items.map((item, iIdx) => {
-                                            const pDesc = products.find((p) => String(p.code) === item.code)?.description || item.code;
-                                            return (
-                                              <TableRow key={`g${gIdx}-row-${iIdx}`}>
-                                                <TableCell>{pDesc}</TableCell>
-                                                <TableCell>{item.quantity}</TableCell>
-                                                <TableCell>{item.sifOrSisbi || ""}</TableCell>
-                                                <TableCell>{item.productTemperature}</TableCell>
-                                                <TableCell>
-                                                  {item.productionDate
-                                                    ? (() => { const [y, m, d] = item.productionDate.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("pt-BR"); })()
-                                                    : ""}
-                                                </TableCell>
-                                                <TableCell>
-                                                  <div className="flex gap-2">
-                                                    <Button type="button" variant="outline" size="icon" aria-label="Editar" onClick={() => openEditProduct(gIdx, iIdx)}>
-                                                      <ClipboardPen className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button type="button" variant="outline" size="icon" aria-label="Remover" onClick={() => deleteProduct(gIdx, iIdx)}>
-                                                      <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                  </div>
-                                                </TableCell>
-                                              </TableRow>
-                                            );
-                                          })}
-                                        </TableBody>
-                                      </Table>
+                                      <div
+                                        className="relative w-full max-w-[calc(100vw-2rem)] sm:max-w-full overflow-x-auto rounded-md border 
+min-w-0"
+                                      >
+                                        <Table>
+                                          <TableHeader>
+                                            <TableRow>
+                                              <TableHead className="text-xs sm:text-sm">
+                                                Produto
+                                              </TableHead>
+                                              <TableHead className="text-xs sm:text-sm">
+                                                Quantidade
+                                              </TableHead>
+                                              <TableHead className="text-xs sm:text-sm">
+                                                SIF/SISBI
+                                              </TableHead>
+                                              <TableHead className="text-xs sm:text-sm">
+                                                Temp (°C)
+                                              </TableHead>
+                                              <TableHead className="text-xs sm:text-sm">
+                                                Produção
+                                              </TableHead>
+                                              <TableHead className="text-xs sm:text-sm">
+                                                Ações
+                                              </TableHead>
+                                            </TableRow>
+                                          </TableHeader>
+                                          <TableBody>
+                                            {group.items.map((item, iIdx) => {
+                                              const pDesc =
+                                                products.find(
+                                                  (p) =>
+                                                    String(p.code) ===
+                                                    item.code,
+                                                )?.description || item.code;
+                                              return (
+                                                <TableRow
+                                                  key={`g${gIdx}-row-${iIdx}`}
+                                                >
+                                                  <TableCell className="text-xs sm:text-sm">
+                                                    {pDesc}
+                                                  </TableCell>
+                                                  <TableCell className="text-xs sm:text-sm">
+                                                    {item.quantity}
+                                                  </TableCell>
+                                                  <TableCell className="text-xs sm:text-sm">
+                                                    {item.sifOrSisbi || ""}
+                                                  </TableCell>
+                                                  <TableCell className="text-xs sm:text-sm">
+                                                    {item.productTemperature}
+                                                  </TableCell>
+                                                  <TableCell className="text-xs sm:text-sm">
+                                                    {item.productionDate
+                                                      ? (() => {
+                                                          const [y, m, d] =
+                                                            item.productionDate
+                                                              .split("-")
+                                                              .map(Number);
+                                                          return new Date(
+                                                            y,
+                                                            m - 1,
+                                                            d,
+                                                          ).toLocaleDateString(
+                                                            "pt-BR",
+                                                          );
+                                                        })()
+                                                      : ""}
+                                                  </TableCell>
+                                                  <TableCell className="text-xs sm:text-sm">
+                                                    <div className="flex gap-2">
+                                                      <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        aria-label="Editar"
+                                                        onClick={() =>
+                                                          openEditProduct(
+                                                            gIdx,
+                                                            iIdx,
+                                                          )
+                                                        }
+                                                      >
+                                                        <ClipboardPen className="h-4 w-4" />
+                                                      </Button>
+                                                      <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        aria-label="Remover"
+                                                        onClick={() =>
+                                                          deleteProduct(
+                                                            gIdx,
+                                                            iIdx,
+                                                          )
+                                                        }
+                                                      >
+                                                        <Trash2 className="h-4 w-4" />
+                                                      </Button>
+                                                    </div>
+                                                  </TableCell>
+                                                </TableRow>
+                                              );
+                                            })}
+                                          </TableBody>
+                                        </Table>
+                                      </div>
                                     ) : (
-                                      <div className="text-sm text-muted-foreground">Nenhum produto adicionado.</div>
+                                      <div className="text-sm text-muted-foreground">
+                                        Nenhum produto adicionado.
+                                      </div>
                                     )}
                                   </div>
 
                                   <div className="flex justify-end">
-                                    <Button type="button" variant="secondary" onClick={() => openAddProduct(gIdx)}>
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      onClick={() => openAddProduct(gIdx)}
+                                    >
                                       Adicionar produto
                                     </Button>
                                   </div>
@@ -1031,26 +1412,46 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                             </AccordionItem>
                           ))}
                         </Accordion>
-                        <Button type="button" onClick={addCustomerGroup}>Adicionar cliente</Button>
+                        <Button type="button" onClick={addCustomerGroup}>
+                          Adicionar cliente
+                        </Button>
                       </motion.div>
 
                       {/* Modal de produto */}
-                      <Dialog open={productModalOpen} onOpenChange={setProductModalOpen}>
+                      <Dialog
+                        open={productModalOpen}
+                        onOpenChange={setProductModalOpen}
+                      >
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>{productEditIndex == null ? "Adicionar produto" : "Editar produto"}</DialogTitle>
-                            <DialogDescription>Preencha os detalhes do produto para o cliente selecionado.</DialogDescription>
+                            <DialogTitle>
+                              {productEditIndex == null
+                                ? "Adicionar produto"
+                                : "Editar produto"}
+                            </DialogTitle>
+                            <DialogDescription>
+                              Preencha os detalhes do produto para o cliente
+                              selecionado.
+                            </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
                             <div className="space-y-2">
                               <Label>Produto expedido</Label>
-                              <Select value={productForm.code} onValueChange={(val) => setProductForm((f) => ({ ...f, code: val }))}>
+                              <Select
+                                value={productForm.code}
+                                onValueChange={(val) =>
+                                  setProductForm((f) => ({ ...f, code: val }))
+                                }
+                              >
                                 <SelectTrigger className="w-full">
                                   <SelectValue placeholder="Selecione um produto" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {products.map((p) => (
-                                    <SelectItem key={p.code} value={String(p.code)}>
+                                    <SelectItem
+                                      key={p.code}
+                                      value={String(p.code)}
+                                    >
                                       {p.description}
                                     </SelectItem>
                                   ))}
@@ -1065,8 +1466,14 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                                 placeholder="Somente números"
                                 value={productForm.quantity}
                                 onChange={(e) => {
-                                  const digits = (e.target.value || "").replace(/\D/g, "");
-                                  setProductForm((f) => ({ ...f, quantity: digits }));
+                                  const digits = (e.target.value || "").replace(
+                                    /\D/g,
+                                    "",
+                                  );
+                                  setProductForm((f) => ({
+                                    ...f,
+                                    quantity: digits,
+                                  }));
                                 }}
                               />
                             </div>
@@ -1075,13 +1482,34 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                               <Label>SIF ou SISBI?</Label>
                               <RadioGroup
                                 value={productForm.sifOrSisbi}
-                                onValueChange={(v) => setProductForm((f) => ({ ...f, sifOrSisbi: v as any }))}
+                                onValueChange={(v) =>
+                                  setProductForm((f) => ({
+                                    ...f,
+                                    sifOrSisbi: v as any,
+                                  }))
+                                }
                                 className="space-y-2"
                               >
-                                {[{ value: "SIF", label: "SIF" }, { value: "SISBI", label: "SISBI" }, { value: "NA", label: "N/A" }].map((opt, index) => (
-                                  <motion.div key={opt.value} className="flex items-center space-x-2 rounded-md border p-3 cursor-pointer hover:bg-accent transition-colors">
-                                    <RadioGroupItem value={opt.value} id={`modal-sis-${index}`} />
-                                    <Label htmlFor={`modal-sis-${index}`} className="cursor-pointer w-full">{opt.label}</Label>
+                                {[
+                                  { value: "SIF", label: "SIF" },
+                                  { value: "SISBI", label: "SISBI" },
+                                  { value: "NA", label: "N/A" },
+                                ].map((opt, index) => (
+                                  <motion.div
+                                    key={opt.value}
+                                    className="flex items-center space-x-2 rounded-md border p-3 cursor-pointer hover
+:bg-accent transition-colors"
+                                  >
+                                    <RadioGroupItem
+                                      value={opt.value}
+                                      id={`modal-sis-${index}`}
+                                    />
+                                    <Label
+                                      htmlFor={`modal-sis-${index}`}
+                                      className="cursor-pointer w-full"
+                                    >
+                                      {opt.label}
+                                    </Label>
                                   </motion.div>
                                 ))}
                               </RadioGroup>
@@ -1094,9 +1522,14 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                                 placeholder="Ex.: 4,5"
                                 value={productForm.productTemperature}
                                 onChange={(e) => {
-                                  let sanitized = (e.target.value || "").replace(/[^\d,-]/g, "");
+                                  let sanitized = (
+                                    e.target.value || ""
+                                  ).replace(/[^\d,-]/g, "");
                                   sanitized = sanitized.replace(/(?!^)-/g, "");
-                                  setProductForm((f) => ({ ...f, productTemperature: sanitized }));
+                                  setProductForm((f) => ({
+                                    ...f,
+                                    productTemperature: sanitized,
+                                  }));
                                 }}
                               />
                             </div>
@@ -1105,9 +1538,22 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                               <Label>Data de produção</Label>
                               <Popover>
                                 <PopoverTrigger asChild>
-                                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                  <Button
+                                    variant="outline"
+                                    className="w-full justify-start text-left font-normal"
+                                  >
                                     {productForm.productionDate
-                                      ? (() => { const [y, m, d] = productForm.productionDate.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("pt-BR"); })()
+                                      ? (() => {
+                                          const [y, m, d] =
+                                            productForm.productionDate
+                                              .split("-")
+                                              .map(Number);
+                                          return new Date(
+                                            y,
+                                            m - 1,
+                                            d,
+                                          ).toLocaleDateString("pt-BR");
+                                        })()
                                       : "Selecione uma data"}
                                   </Button>
                                 </PopoverTrigger>
@@ -1115,11 +1561,24 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                                   {/* @ts-ignore */}
                                   <Calendar
                                     mode="single"
-                                    selected={productForm.productionDate ? (() => { const [y, m, d] = productForm.productionDate.split("-").map(Number); return new Date(y, m - 1, d); })() : undefined}
+                                    selected={
+                                      productForm.productionDate
+                                        ? (() => {
+                                            const [y, m, d] =
+                                              productForm.productionDate
+                                                .split("-")
+                                                .map(Number);
+                                            return new Date(y, m - 1, d);
+                                          })()
+                                        : undefined
+                                    }
                                     onSelect={(date: Date | undefined) => {
                                       if (!date) return;
                                       const isoLocal = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-                                      setProductForm((f) => ({ ...f, productionDate: isoLocal }));
+                                      setProductForm((f) => ({
+                                        ...f,
+                                        productionDate: isoLocal,
+                                      }));
                                     }}
                                   />
                                 </PopoverContent>
@@ -1127,8 +1586,18 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                             </div>
                           </div>
                           <DialogFooter>
-                            <Button type="button" variant="secondary" onClick={() => setProductModalOpen(false)}>Cancelar</Button>
-                            <Button type="button" onClick={saveProductModal}>{productEditIndex == null ? "Adicionar" : "Salvar"}</Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => setProductModalOpen(false)}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button type="button" onClick={saveProductModal}>
+                              {productEditIndex == null
+                                ? "Adicionar"
+                                : "Salvar"}
+                            </Button>
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>
@@ -1139,11 +1608,15 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                 {/* Step 5: Revisão */}
                 {currentStep === 3 && (
                   <>
-                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 pb-4">
-                      <CardTitle className="text-2xl font-bold text-gray-900">Revisão</CardTitle>
-                      <p className="text-sm text-gray-500 mt-1">Confira todos os dados antes de confirmar</p>
+                    <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-100 p-3 sm:p-6 pb-4">
+                      <CardTitle className="text-2xl font-bold text-gray-900">
+                        Revisão
+                      </CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Confira todos os dados antes de confirmar
+                      </p>
                     </CardHeader>
-                    <CardContent className="space-y-6 pt-6 pb-4 max-h-[60vh] overflow-y-auto">
+                    <CardContent className="space-y-6 p-3 sm:p-6 pt-6 pb-4 max-h-[60vh] overflow-y-auto overflow-x-auto">
                       {/* Nota Fiscal */}
                       <motion.div variants={fadeInUp} className="space-y-2">
                         <Label>Nota Fiscal</Label>
@@ -1154,58 +1627,141 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                       <motion.div variants={fadeInUp} className="space-y-3">
                         <Label>Clientes e produtos</Label>
                         {formData.customerGroups.length === 0 ? (
-                          <div className="text-sm text-muted-foreground">Nenhum cliente adicionado.</div>
+                          <div className="text-sm text-muted-foreground">
+                            Nenhum cliente adicionado.
+                          </div>
                         ) : (
-                          <Accordion type="single" collapsible defaultValue={`client-0`}>
+                          <Accordion
+                            type="single"
+                            collapsible
+                            defaultValue={`client-0`}
+                          >
                             {formData.customerGroups.map((group, gIdx) => (
-                              <AccordionItem key={`review-client-${gIdx}`} value={`client-${gIdx}`}>
+                              <AccordionItem
+                                key={`review-client-${gIdx}`}
+                                value={`client-${gIdx}`}
+                              >
                                 <AccordionTrigger>
                                   {group.clientName || `Cliente ${gIdx + 1}`}
                                 </AccordionTrigger>
                                 <AccordionContent>
-                                  <div className="flex justify-end gap-2 mb-3">
-                                    <Button type="button" variant="outline" onClick={() => setCurrentStep(2)}>
-                                      <ClipboardPen className="mr-2 h-4 w-4" /> Editar cliente
+                                  <div className="flex flex-col sm:flex-row justify-end gap-2 mb-3">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => setCurrentStep(2)}
+                                    >
+                                      <ClipboardPen className="mr-2 h-4 w-4" />{" "}
+                                      Editar cliente
                                     </Button>
-                                    <Button type="button" variant="outline" onClick={() => removeCustomerGroup(gIdx)}>
-                                      <Trash2 className="mr-2 h-4 w-4" /> Excluir cliente
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => removeCustomerGroup(gIdx)}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />{" "}
+                                      Excluir cliente
                                     </Button>
                                   </div>
                                   {group.items.length === 0 ? (
-                                    <div className="text-sm text-muted-foreground">Nenhum produto adicionado.</div>
+                                    <div className="text-sm text-muted-foreground">
+                                      Nenhum produto adicionado.
+                                    </div>
                                   ) : (
-                                    <div className="rounded-md border">
-                                      <Table>
+                                    <div
+                                      className="relative w-full max-w-[calc(100vw-2rem)] sm:max-w-full overflow-x-auto rounded-md border mi
+n-w-0"
+                                    >
+                                      <Table className="min-w-full">
                                         <TableHeader>
                                           <TableRow>
-                                            <TableHead>Produto</TableHead>
-                                            <TableHead>Quantidade</TableHead>
-                                            <TableHead>SIF/SISBI</TableHead>
-                                            <TableHead>Temperatura (°C)</TableHead>
-                                            <TableHead>Data de produção</TableHead>
-                                            <TableHead>Ações</TableHead>
+                                            <TableHead className="text-xs sm:text-sm">
+                                              Produto
+                                            </TableHead>
+                                            <TableHead className="text-xs sm:text-sm">
+                                              Quantidade
+                                            </TableHead>
+                                            <TableHead className="text-xs sm:text-sm">
+                                              SIF/SISBI
+                                            </TableHead>
+                                            <TableHead className="text-xs sm:text-sm">
+                                              Temperatura (°C)
+                                            </TableHead>
+                                            <TableHead className="text-xs sm:text-sm">
+                                              Data de produção
+                                            </TableHead>
+                                            <TableHead className="text-xs sm:text-sm">
+                                              Ações
+                                            </TableHead>
                                           </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                           {group.items.map((it, idx) => {
-                                            const desc = products.find((p) => String(p.code) === String(it.code))?.description || it.code;
+                                            const desc =
+                                              products.find(
+                                                (p) =>
+                                                  String(p.code) ===
+                                                  String(it.code),
+                                              )?.description || it.code;
                                             return (
-                                              <TableRow key={`review-row-${gIdx}-${idx}`}>
-                                                <TableCell>{desc}</TableCell>
-                                                <TableCell>{it.quantity}</TableCell>
-                                                <TableCell>{it.sifOrSisbi || "N/A"}</TableCell>
-                                                <TableCell>{it.productTemperature}</TableCell>
-                                                <TableCell>
+                                              <TableRow
+                                                key={`review-row-${gIdx}-${idx}`}
+                                              >
+                                                <TableCell className="text-xs sm:text-sm">
+                                                  {desc}
+                                                </TableCell>
+                                                <TableCell className="text-xs sm:text-sm">
+                                                  {it.quantity}
+                                                </TableCell>
+                                                <TableCell className="text-xs sm:text-sm">
+                                                  {it.sifOrSisbi || "N/A"}
+                                                </TableCell>
+                                                <TableCell className="text-xs sm:text-sm">
+                                                  {it.productTemperature}
+                                                </TableCell>
+                                                <TableCell className="text-xs sm:text-sm">
                                                   {it.productionDate
-                                                    ? (() => { const [y, m, d] = it.productionDate.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("pt-BR"); })()
+                                                    ? (() => {
+                                                        const [y, m, d] =
+                                                          it.productionDate
+                                                            .split("-")
+                                                            .map(Number);
+                                                        return new Date(
+                                                          y,
+                                                          m - 1,
+                                                          d,
+                                                        ).toLocaleDateString(
+                                                          "pt-BR",
+                                                        );
+                                                      })()
                                                     : "—"}
                                                 </TableCell>
-                                                <TableCell>
+                                                <TableCell className="text-xs sm:text-sm">
                                                   <div className="flex gap-2">
-                                                    <Button type="button" variant="outline" size="icon" aria-label="Editar produto" onClick={() => { setCurrentStep(2); openEditProduct(gIdx, idx); }}>
+                                                    <Button
+                                                      type="button"
+                                                      variant="outline"
+                                                      size="icon"
+                                                      aria-label="Editar produto"
+                                                      onClick={() => {
+                                                        setCurrentStep(2);
+                                                        openEditProduct(
+                                                          gIdx,
+                                                          idx,
+                                                        );
+                                                      }}
+                                                    >
                                                       <ClipboardPen className="h-4 w-4" />
                                                     </Button>
-                                                    <Button type="button" variant="outline" size="icon" aria-label="Excluir produto" onClick={() => deleteProduct(gIdx, idx)}>
+                                                    <Button
+                                                      type="button"
+                                                      variant="outline"
+                                                      size="icon"
+                                                      aria-label="Excluir produto"
+                                                      onClick={() =>
+                                                        deleteProduct(gIdx, idx)
+                                                      }
+                                                    >
                                                       <Trash2 className="h-4 w-4" />
                                                     </Button>
                                                   </div>
@@ -1236,7 +1792,10 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                         <Input
                           readOnly
                           value={(() => {
-                            const v = vehicles.find((vv) => String(vv.id) === String(formData.vehicleId));
+                            const v = vehicles.find(
+                              (vv) =>
+                                String(vv.id) === String(formData.vehicleId),
+                            );
                             return v ? `${v.plate} — ${v.model}` : "";
                           })()}
                         />
@@ -1253,7 +1812,7 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
               </motion.div>
             </AnimatePresence>
 
-            <CardFooter className="flex justify-between items-center pt-6 pb-6 px-6 bg-gray-50 border-t border-gray-100">
+            <CardFooter className="flex justify-between items-center p-3 sm:p-6 pt-6 pb-6 bg-gray-50 border-t border-gray-100">
               <motion.div
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -1263,7 +1822,8 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                   variant="outline"
                   onClick={prevStep}
                   disabled={currentStep === 0}
-                  className="flex items-center gap-2 transition-all duration-300 rounded-xl border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-100 px-6 py-2 h-11 font-medium"
+                  className="flex items-center gap-2 transition-all duration-300 rounded-xl border-2 border-gray-300 hover:border-gray-400 hove
+r:bg-gray-100 px-6 py-2 h-11 font-medium"
                 >
                   <ChevronLeft className="h-4 w-4" /> Voltar
                 </Button>
@@ -1287,16 +1847,19 @@ const OnboardingForm = ({ onSuccess }: OnboardingFormProps) => {
                     "flex items-center gap-2 transition-all duration-300 rounded-xl px-6 py-2 h-11 font-medium shadow-md hover:shadow-lg",
                     currentStep === steps.length - 1
                       ? "bg-linear-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
-                      : "bg-linear-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black"
+                      : "bg-linear-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black",
                   )}
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Gerando Relatório...
+                      <Loader2 className="h-4 w-4 animate-spin" /> Gerando
+                      Relatório...
                     </>
                   ) : (
                     <>
-                      {currentStep === steps.length - 1 ? "Confirmar" : "Próximo"}
+                      {currentStep === steps.length - 1
+                        ? "Confirmar"
+                        : "Próximo"}
                       {currentStep === steps.length - 1 ? (
                         <Check className="h-4 w-4" />
                       ) : (

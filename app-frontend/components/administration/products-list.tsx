@@ -19,6 +19,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface ApiProduct {
   code: number;
@@ -48,6 +50,7 @@ export function ProductsList({ onAdd }: ProductsListProps) {
   const [hasNext, setHasNext] = useState(false);
   const limit = 10;
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [editOpen, setEditOpen] = useState(false);
   const [selected, setSelected] = useState<ApiProduct | null>(null);
@@ -216,68 +219,125 @@ export function ProductsList({ onAdd }: ProductsListProps) {
       showHeader={true}
       actionPlacement="footer"
     >
-      <div className="w-full overflow-x-auto">
-        <Table className="min-w-max">
-          <TableHeader>
-            <TableRow className="text-gray-500">
-              <TableHead className="w-[90px]">Cod.</TableHead>
-              <TableHead>Descricao</TableHead>
-              <TableHead>Grupo</TableHead>
-              <TableHead>Marca</TableHead>
-              <TableHead>Dt. Ultima Compra</TableHead>
-              <TableHead>Dt. Ultima Venda</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {products.map((product) => (
-              <TableRow key={product.code} className="text-gray-700">
-                <TableCell className="font-medium text-gray-900">
-                  {product.code}
-                </TableCell>
-                <TableCell>{product.description}</TableCell>
-                <TableCell>{product.group}</TableCell>
-                <TableCell>{product.company}</TableCell>
-                <TableCell>{formatDate(product.last_buying_date)}</TableCell>
-                <TableCell>{formatDate(product.last_sale_date)}</TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
-                      onClick={() => openEdit(product)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
-                      onClick={() => openDelete(product)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+      {isMobile ? (
+        <div className="space-y-4">
+          {products.map((product) => (
+            <Card key={product.code} className="p-4">
+              <CardContent className="p-0">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium text-gray-900">{product.description}</p>
+                      <p className="text-sm text-gray-600">Grupo: {product.group}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => openEdit(product)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-600"
+                        onClick={() => openDelete(product)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </TableCell>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p><strong>Código:</strong> {product.code}</p>
+                    <p><strong>Marca:</strong> {product.company}</p>
+                    <p><strong>Última Compra:</strong> {formatDate(product.last_buying_date)}</p>
+                    <p><strong>Última Venda:</strong> {formatDate(product.last_sale_date)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="w-full overflow-x-auto">
+          <Table className="min-w-max">
+            <TableHeader>
+              <TableRow className="text-gray-500">
+                <TableHead className="w-[90px]">Cod.</TableHead>
+                <TableHead>Descricao</TableHead>
+                <TableHead>Grupo</TableHead>
+                <TableHead>Marca</TableHead>
+                <TableHead>Dt. Ultima Compra</TableHead>
+                <TableHead>Dt. Ultima Venda</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {products.map((product) => (
+                <TableRow key={product.code} className="text-gray-700">
+                  <TableCell className="font-medium text-gray-900">
+                    {product.code}
+                  </TableCell>
+                  <TableCell>{product.description}</TableCell>
+                  <TableCell>{product.group}</TableCell>
+                  <TableCell>{product.company}</TableCell>
+                  <TableCell>{formatDate(product.last_buying_date)}</TableCell>
+                  <TableCell>{formatDate(product.last_sale_date)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
+                        onClick={() => openEdit(product)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900"
+                        onClick={() => openDelete(product)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <div className="flex items-center justify-between p-4">
         <Button

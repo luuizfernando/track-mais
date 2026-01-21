@@ -21,6 +21,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { Card, CardContent } from "@/components/ui/card"
 
 type ApiUser = {
   id: number
@@ -70,6 +72,7 @@ export function UsersList({ onAdd }: UsersListProps) {
   const limit = 13
   const [hasNext, setHasNext] = useState(false)
   const { toast } = useToast()
+  const isMobile = useIsMobile()
 
   const [editOpen, setEditOpen] = useState(false)
   const [selected, setSelected] = useState<UserRow | null>(null)
@@ -193,39 +196,80 @@ export function UsersList({ onAdd }: UsersListProps) {
 
   return (
     <AdminListCard meta={TAB_CONFIG.usuarios} onAdd={onAdd} showHeader actionPlacement="footer">
-      <Table>
-        <TableHeader>
-          <TableRow className="text-gray-500">
-            <TableHead>Nome</TableHead>
-            <TableHead>Nome de usuário</TableHead>
-            <TableHead>Perfil</TableHead>
-            <TableHead className="text-center">Status</TableHead>
-            <TableHead className="text-center">Ações</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      {isMobile ? (
+        <div className="space-y-4">
           {rows.map((user, index) => (
-            <TableRow key={`${user.id}-${index}`} className="text-gray-700">
-              <TableCell className="font-medium text-gray-900">{user.name}</TableCell>
-              <TableCell>{user.username}</TableCell>
-              <TableCell>{user.role}</TableCell>
-              <TableCell className="text-center">
-                <Badge className={STATUS_CLASS_MAP[user.status]}>{user.status}</Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center justify-end gap-2">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900" onClick={() => openEdit(user)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900" onClick={() => openDelete(user)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+            <Card key={`${user.id}-${index}`} className="p-4">
+              <CardContent className="p-0">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium text-gray-900">{user.name}</p>
+                      <p className="text-sm text-gray-600">@{user.username}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => openEdit(user)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-600"
+                        onClick={() => openDelete(user)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={STATUS_CLASS_MAP[user.status]}>{user.status}</Badge>
+                    <span className="text-sm text-gray-600">{user.role}</span>
+                  </div>
                 </div>
-              </TableCell>
-            </TableRow>
+              </CardContent>
+            </Card>
           ))}
-        </TableBody>
-      </Table>
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow className="text-gray-500">
+              <TableHead>Nome</TableHead>
+              <TableHead>Nome de usuário</TableHead>
+              <TableHead>Perfil</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-center">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((user, index) => (
+              <TableRow key={`${user.id}-${index}`} className="text-gray-700">
+                <TableCell className="font-medium text-gray-900">{user.name}</TableCell>
+                <TableCell>{user.username}</TableCell>
+                <TableCell>{user.role}</TableCell>
+                <TableCell className="text-center">
+                  <Badge className={STATUS_CLASS_MAP[user.status]}>{user.status}</Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900" onClick={() => openEdit(user)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-500 hover:text-gray-900" onClick={() => openDelete(user)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
       {/* controles de paginação */}
       <div className="flex items-center justify-between p-4">
